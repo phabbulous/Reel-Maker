@@ -2909,8 +2909,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const btn = e.target.closest('button[data-act]'); if (!btn) return;
     const c = btn.closest('.clip')._clip, act = btn.dataset.act, lay = btn.closest('.layer');
     if (act === 'remove') return removeClip(c);
-    if (act === 'set-start') { c.start = clamp(vid.currentTime, 0, S.dur); if (c.end < c.start + 1) c.end = Math.min(S.dur, c.start + minLen()); syncClip(c); markStale(c); setActive(c); return; }
-    if (act === 'set-end') { c.end = clamp(vid.currentTime, 0, S.dur); if (c.start > c.end - 1) c.start = Math.max(0, c.end - minLen()); syncClip(c); markStale(c); setActive(c); return; }
+    if (act === 'set-start') { c.start = clamp(cvVid.currentTime, 0, S.dur); if (c.end < c.start + 1) c.end = Math.min(S.dur, c.start + minLen()); syncClip(c); markStale(c); setActive(c); return; }
+    if (act === 'set-end') { c.end = clamp(cvVid.currentTime, 0, S.dur); if (c.start > c.end - 1) c.start = Math.max(0, c.end - minLen()); syncClip(c); markStale(c); setActive(c); return; }
     if (act === 'look') { if (S.busy) return; toggleClipPreview(c); return; }
     if (act === 'replay') { replayClipPreview(c); return; }
     if (act === 'hideprev') { closeClipPreview(c); return; }
