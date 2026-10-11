@@ -7,7 +7,7 @@
 <style>[hidden]{display:none!important}body{margin:0}</style>
 </head>
 <body>
-<title>Reel Maker v4.3</title>
+<title>Reel Maker v4.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@700&family=Noto+Sans:wght@700&family=Bebas+Neue&family=Oswald:wght@400;700&family=Mukta:wght@700&family=Albert+Sans:wght@700&family=Archivo+Black&family=Archivo:wght@700&family=Epilogue:wght@700&family=Hind+Siliguri:wght@700&family=Luckiest+Guy&family=Montserrat:wght@900&family=Anton&display=swap">
@@ -186,8 +186,13 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
 
 <div class="app">
   <header>
-    <h1>Reel Maker <span class="meta">v4.3</span></h1>
+    <h1>Reel Maker <span class="meta">v4.5</span></h1>
     <p class="lede">Crops the bars off your videos, centers the scene on a black 9:16 canvas and puts your text on it. Your videos stay on this device.</p>
+    <details class="canvasbox" id="diag" style="margin-top:8px"><summary>Check this browser</summary>
+      <p class="hint">Not sure why something fails on one browser? This shows what this browser can do. Take a screenshot to compare browsers or send it to me.</p>
+      <button type="button" class="btn small" id="diagRun">Run the check</button>
+      <pre id="diagOut" class="note" style="white-space:pre-wrap;margin:8px 0 0;font-family:var(--font-mono);font-size:12.5px"></pre>
+    </details>
   </header>
 
   <section class="step" aria-labelledby="h-video">
@@ -3325,19 +3330,23 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     pbDur.textContent = fmt(r ? r.e - r.s : (S.dur || 0));
   }
   const syncPbPlay = () => { pbPlay.textContent = vid.paused ? '▶' : '⏸'; pbPlay.setAttribute('aria-label', vid.paused ? 'Play' : 'Pause'); };
+  // The clip end only stops playback when the clip's own preview button started it. The source video itself always plays freely.
+  let previewEnd = null;
   async function playPreview() {
     if (S.busy || !S.url) return;
     const r = clipRange();
     if (r && (vid.currentTime < r.s - 0.05 || vid.currentTime >= r.e - 0.05)) {
       try { await seekTo(r.s); } catch (x) { /* ignore */ }
     }
-    try { await vid.play(); } catch (e) { /* ignore */ }
+    try { await vid.play(); if (r) previewEnd = r.e; } catch (e) { /* ignore */ }
   }
   pbPlay.addEventListener('click', async () => {
     if (S.busy || !S.url) return;
     if (vid.paused) playPreview(); else vid.pause();
   });
   vid.addEventListener('play', syncPbPlay); vid.addEventListener('pause', syncPbPlay);
+  vid.addEventListener('pause', () => { previewEnd = null; });
+  vid.addEventListener('seeking', () => { previewEnd = null; });
   pbMute.addEventListener('click', () => {
     vid.muted = !vid.muted;
     pbMute.textContent = vid.muted ? '🔇' : '🔊';
@@ -3360,9 +3369,10 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   vid.addEventListener('timeupdate', () => {
     const r = clipRange(), t = vid.currentTime;
     if (r) {
-      if (!vid.paused && t >= r.e - 0.04) { // stop at the end of the clip
+      if (previewEnd !== null && !vid.paused && t >= previewEnd - 0.04) { // clip preview reached its end
+        const end = previewEnd; previewEnd = null;
         vid.pause();
-        if (t > r.e + 0.05) { try { vid.currentTime = r.e; } catch (x) { /* ignore */ } }
+        if (t > end + 0.05) { try { vid.currentTime = end; } catch (x) { /* ignore */ } }
       }
       if (!scrubbing) pbSeek.value = Math.round(clamp((t - r.s) / (r.e - r.s), 0, 1) * 1000);
       pbCur.textContent = fmt(clamp(t - r.s, 0, r.e - r.s));
@@ -3840,6 +3850,39 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const sv = c.el.querySelector('button[data-act="save"]'); if (sv) sv.disabled = false;
     }));
   }
+
+  /* ---------- browser check ---------- */
+  $('#diagRun').addEventListener('click', async () => {
+    const out = $('#diagOut'), rows = [], v = document.createElement('video');
+    const yn = b => (b ? 'yes' : 'NO');
+    const can = t => { const r = v.canPlayType(t); return r ? 'yes (' + r + ')' : 'NO'; };
+    rows.push('Browser: ' + navigator.userAgent.replace(/\s+/g, ' ').slice(0, 140));
+    rows.push('Opened inside another page or app: ' + (IN_FRAME ? 'YES (downloads may be blocked, open it directly)' : 'no'));
+    rows.push('Plays H.264 MP4: ' + can('video/mp4; codecs="avc1.640028"'));
+    rows.push('Plays HEVC/H.265: ' + can('video/mp4; codecs="hvc1.1.6.L93.B0"'));
+    rows.push('Plays WebM (VP9): ' + can('video/webm; codecs="vp9"'));
+    rows.push('Plays AAC sound: ' + can('audio/mp4; codecs="mp4a.40.2"'));
+    rows.push('Can record the canvas (captureStream): ' + yn(!!pv.captureStream));
+    rows.push('Can record video (MediaRecorder): ' + yn(typeof MediaRecorder !== 'undefined'));
+    if (typeof MediaRecorder !== 'undefined') {
+      const ok = t => { try { return MediaRecorder.isTypeSupported(t); } catch (e) { return false; } };
+      rows.push('  records MP4 with AAC: ' + yn(ok('video/mp4;codecs=avc1.640028,mp4a.40.2')));
+      rows.push('  records plain MP4: ' + yn(ok('video/mp4')));
+      rows.push('  records WebM: ' + yn(ok('video/webm')));
+      rows.push('  chosen recorder format: ' + (pickMime() || 'browser default'));
+    }
+    let h264enc = 'not available';
+    try { if (window.VideoEncoder) h264enc = (await VideoEncoder.isConfigSupported({ codec: 'avc1.640028', width: 1080, height: 1920, bitrate: 8e6, framerate: 30 })).supported ? 'yes' : 'NO'; } catch (e) { h264enc = 'NO'; }
+    rows.push('Fast engine possible (H.264 encoder): ' + h264enc);
+    rows.push('Can share files (share sheet): ' + yn(!!(navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.mp4', { type: 'video/mp4' })] }))));
+    rows.push('Keep-screen-on support: ' + yn(!!navigator.wakeLock));
+    rows.push('Audio capture from video: ' + yn(!!(window.AudioContext || window.webkitAudioContext)));
+    rows.push('Fonts ready: ' + (document.fonts && document.fonts.check('700 20px "Bebas Neue"') ? 'yes' : 'still loading, or blocked'));
+    let blobDl = 'unknown';
+    try { blobDl = 'download attribute ' + yn('download' in document.createElement('a')); } catch (e) { /* ignore */ }
+    rows.push('Direct download link: ' + blobDl);
+    out.textContent = rows.join('\n');
+  });
 
   document.fonts && document.fonts.load('700 66px Inter').then(requestPreview, () => {});
   drawComposite(pctx, null, true);
