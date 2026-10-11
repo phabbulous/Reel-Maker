@@ -126,6 +126,7 @@ input[type="number"] { text-align: center; font-family: var(--font-mono); }
 .textfield { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
 textarea { resize: vertical; min-height: 64px; line-height: 1.35; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.resbtns .fname { flex: 1 1 150px; }
 .res { display: grid; gap: 8px; border-top: 1px dashed var(--line); padding-top: 10px; }
 .bar { height: 6px; background: var(--field); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
 .bar > i { display: block; height: 100%; width: 0; background: var(--accent); }
@@ -2660,7 +2661,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       '<div class="layers listcol"></div>' +
       '<div class="actions"><button type="button" class="btn small" data-act="add-layer">Add another text</button><button type="button" class="btn small" data-act="look">Show this clip</button><button type="button" class="btn primary small" data-act="make">Make clip</button></div>' +
       '<div class="clipprev" hidden><canvas width="360" height="640"></canvas><span class="hint">Tap the preview to pause or play.</span><div class="row"><button type="button" class="btn small" data-act="replay">Replay</button><button type="button" class="btn small" data-act="hideprev">Close</button></div></div>' +
-      '<div class="res" hidden><div class="bar"><i></i></div><p class="note"></p><div class="actions resbtns" hidden><button type="button" class="btn small" data-act="save">Save video</button>' + (CAN_SHARE_BTN ? '<button type="button" class="btn small" data-act="share">Share</button>' : '') + '<button type="button" class="btn small" data-act="watch">Watch</button></div><div class="resv"></div></div>';
+      '<div class="res" hidden><div class="bar"><i></i></div><p class="note"></p><div class="actions resbtns" hidden><input type="text" class="fname" placeholder="File name (optional)" aria-label="File name" autocomplete="off"><button type="button" class="btn small" data-act="save">Save video</button>' + (CAN_SHARE_BTN ? '<button type="button" class="btn small" data-act="share">Share</button>' : '') + '<button type="button" class="btn small" data-act="watch">Watch</button></div><div class="resv"></div></div>';
     const c = {
       id, el, v, start, end, layers: [], stale: false, blob: null, ext: '', url: null,
       inS: $('input[id^="s"]', el), inE: $('input[id^="e"]', el), layersEl: $('.layers', el),
@@ -3866,7 +3867,12 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   });
   $('#stopBtn').addEventListener('click', () => { S.cancel = true; });
 
-  const clipName = c => c.v.name + '-clip' + (c.v.clips.indexOf(c) + 1) + '.' + c.ext;
+  const clipName = c => {
+    const inp = c.el && c.el.querySelector('input.fname');
+    const custom = inp ? inp.value.trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').replace(/\.[a-z0-9]{2,5}$/i, '') : '';
+    if (custom) return custom + '.' + c.ext;
+    return c.v.name + '-clip' + (c.v.clips.indexOf(c) + 1) + '.' + c.ext;
+  };
   function anchorDownload(c) {
     const url = URL.createObjectURL(c.blob), a = document.createElement('a');
     a.href = url; a.download = clipName(c); a.rel = 'noopener'; a.style.display = 'none';
