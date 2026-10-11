@@ -3666,14 +3666,14 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         audio: { codec: useAAC ? 'aac' : 'opus', sampleRate: sr, numberOfChannels: nch },
         fastStart: 'in-memory', firstTimestampBehavior: 'offset'
       });
-      let encErr = null;
+      let encErr = null, aChunks = 0;
       vEnc = new VideoEncoder({
         output: (ch, meta) => { try { muxer.addVideoChunk(ch, meta); } catch (e) { encErr = encErr || e; } },
         error: e => { encErr = encErr || e; }
       });
       vEnc.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: 14000000, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } });
       aEnc = new AudioEncoder({
-        output: (ch, meta) => { try { muxer.addAudioChunk(ch, meta); } catch (e) { encErr = encErr || e; } },
+        output: (ch, meta) => { aChunks++; try { muxer.addAudioChunk(ch, meta); } catch (e) { encErr = encErr || e; } },
         error: e => { encErr = encErr || e; }
       });
       aEnc.configure(useAAC
@@ -3691,6 +3691,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       }
       await aEnc.flush();
       if (encErr) throw encErr;
+      if (!aChunks) throw new Error('noaudio'); // encoder gave no audio: fall back to the normal recorder
       // Video: seek, composite, encode — as fast as the decoder can go, no realtime wait.
       const ft = Math.round(1e6 / FPS), keyEvery = FPS * 2;
       for (let i = 0; i < total; i++) {
