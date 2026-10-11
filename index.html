@@ -7,7 +7,7 @@
 <style>[hidden]{display:none!important}body{margin:0}</style>
 </head>
 <body>
-<title>Reel Maker v4.5</title>
+<title>Reel Maker v4.6</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@700&family=Noto+Sans:wght@700&family=Bebas+Neue&family=Oswald:wght@400;700&family=Mukta:wght@700&family=Albert+Sans:wght@700&family=Archivo+Black&family=Archivo:wght@700&family=Epilogue:wght@700&family=Hind+Siliguri:wght@700&family=Luckiest+Guy&family=Montserrat:wght@900&family=Anton&display=swap">
@@ -186,7 +186,7 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
 
 <div class="app">
   <header>
-    <h1>Reel Maker <span class="meta">v4.5</span></h1>
+    <h1>Reel Maker <span class="meta">v4.6</span></h1>
     <p class="lede">Crops the bars off your videos, centers the scene on a black 9:16 canvas and puts your text on it. Your videos stay on this device.</p>
     <details class="canvasbox" id="diag" style="margin-top:8px"><summary>Check this browser</summary>
       <p class="hint">Not sure why something fails on one browser? This shows what this browser can do. Take a screenshot to compare browsers or send it to me.</p>
@@ -2252,6 +2252,11 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   'use strict';
   const $ = (s, r = document) => r.querySelector(s);
   const vid = $('#vid'), fileIn = $('#file'), pv = $('#pv'), pctx = pv.getContext('2d');
+  // Three separate players: `vid` is the source video (free, native controls), `cvVid` drives the big canvas preview and the
+  // playhead bar (limited to the selected clip, also used for recording and scans), and each clip's Show this clip player has its own.
+  const cvVid = document.createElement('video');
+  cvVid.playsInline = true; cvVid.setAttribute('webkit-playsinline', ''); cvVid.preload = 'auto'; cvVid.style.display = 'none';
+  document.body.appendChild(cvVid);
   let W = 1080, H = 1920;
   const RATIOS = [['9:16', 1080, 1920], ['1:1', 1080, 1080], ['4:5', 1080, 1350], ['16:9', 1920, 1080]];
   const FONT = 'Inter, "Helvetica Neue", Arial, sans-serif';
@@ -2344,16 +2349,32 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     return best;
   }
 
+  // Seeks the canvas video (never the source video the viewer is watching).
   function seekTo(t) {
     return new Promise(res => {
       t = clamp(t, 0, Math.max(0, (S.dur || 0) - 0.05));
-      if (Math.abs(vid.currentTime - t) < 0.01 && vid.readyState >= 2) { res(); return; }
+      if (Math.abs(cvVid.currentTime - t) < 0.01 && cvVid.readyState >= 2) { res(); return; }
       let done = false;
-      const fin = () => { if (done) return; done = true; vid.removeEventListener('seeked', fin); clearTimeout(to); res(); };
+      const fin = () => { if (done) return; done = true; cvVid.removeEventListener('seeked', fin); clearTimeout(to); res(); };
       const to = setTimeout(fin, 6000);
-      vid.addEventListener('seeked', fin);
-      vid.currentTime = t;
+      cvVid.addEventListener('seeked', fin);
+      cvVid.currentTime = t;
     });
+  }
+  function loadCv(url) {
+    if (cvVid._url === url && cvVid.readyState >= 1) return Promise.resolve(true);
+    return new Promise(res => {
+      const t = setTimeout(() => res(false), 60000);
+      cvVid.onloadedmetadata = () => { clearTimeout(t); res(true); };
+      cvVid.onerror = () => { clearTimeout(t); res(false); };
+      cvVid._url = url; cvVid.src = url; cvVid.load();
+    }).then(ok => { cvVid.onloadedmetadata = null; cvVid.onerror = null; if (!ok) cvVid._url = ''; else cvVid.playbackRate = 1; return ok; });
+  }
+  // Puts the canvas on the first frame of a clip (used when a clip is selected or its times change).
+  function cvGoToStart(c) {
+    if (!c || S.busy || !S.url || !S.dur || cvVid._url !== S.url) return Promise.resolve();
+    cvVid.pause();
+    return seekTo(c.start).then(requestPreview, () => {});
   }
 
   async function detectCrop() {
@@ -2364,7 +2385,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const cv = document.createElement('canvas'); cv.width = Math.round(S.vw * sc); cv.height = Math.round(S.vh * sc);
     const cx = cv.getContext('2d', { willReadFrequently: true });
     const aw = cv.width, ah = cv.height;
-    const grab = async t => { await seekTo(t); cx.drawImage(vid, 0, 0, aw, ah); return cx.getImageData(0, 0, aw, ah).data; };
+    const grab = async t => { await seekTo(t); cx.drawImage(cvVid, 0, 0, aw, ah); return cx.getImageData(0, 0, aw, ah).data; };
     try {
       const rowHit = new Uint16Array(ah);
       for (let i = 0; i < N; i++) {
@@ -2486,7 +2507,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   let bgMid = null;
   let bgCv = null; // scratch canvas for the blurred-video background
   function drawComposite(ctx, layers, guides, vel) {
-    vel = vel || vid;
+    vel = vel || cvVid;
     ctx.fillStyle = S.bg || '#000'; ctx.fillRect(0, 0, W, H);
     if (S.bgMode === 'blur' && S.vw && vel.readyState >= 2) {
       // Blurred-video background. Done by drawing the crop area tiny and stretching
@@ -2545,9 +2566,17 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   }
 
   const activeLayers = () => (S.active ? S.active.layers : null);
-  function requestPreview() { if (raf || S.busy) return; raf = requestAnimationFrame(() => { raf = 0; drawComposite(pctx, activeLayers(), true); }); }
+  function requestPreview() { if (raf || S.busy) return; raf = requestAnimationFrame(() => { raf = 0; drawComposite(pctx, activeLayers(), true); drawOpenInline(); }); }
   let playLoop = 0;
-  function loop() { if (vid.paused || S.busy) { playLoop = 0; return; } drawComposite(pctx, activeLayers(), true); playLoop = requestAnimationFrame(loop); }
+  function loop() {
+    if (cvVid.paused || S.busy) { playLoop = 0; return; }
+    const r = clipRange();
+    if (r && cvVid.currentTime >= r.e - 0.02) { // the canvas stops exactly at the end of its clip
+      cvVid.pause(); try { cvVid.currentTime = r.e; } catch (x) { /* ignore */ }
+      drawComposite(pctx, activeLayers(), true); updatePb(); playLoop = 0; return;
+    }
+    drawComposite(pctx, activeLayers(), true); updatePb(); playLoop = requestAnimationFrame(loop);
+  }
 
   // Dragging the preview moves the text that is selected. Tapping it (no drag)
   // toggles playback, like tapping the video itself.
@@ -2576,8 +2605,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     if (tapPt && e && e.clientX != null && S.url && !S.busy) {
       const moved = Math.hypot(e.clientX - tapPt.x, e.clientY - tapPt.y);
       if (moved < 10 && Date.now() - tapT < 500) {
-        if (vid.paused) playPreview();
-        else vid.pause();
+        if (cvVid.paused) playPreview();
+        else cvVid.pause();
       }
     }
     tapPt = null; drag = null;
@@ -2654,12 +2683,14 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     $('#clipEmpty').hidden = !!(cur && cur.clips.length);
   }
   function setActive(c) {
+    const changed = S.active !== c;
     S.active = c;
     S.clips.forEach(x => x.el.classList.toggle('active', x === c));
     if (!c) S.sel = null; else if (!S.sel || S.sel.c !== c) S.sel = { c, L: c.layers[0] };
     $('#pvLabel').textContent = c ? 'Clip ' + (S.clips.indexOf(c) + 1) : 'Layout example';
     if (typeof syncPbDur === 'function') syncPbDur();
     requestPreview();
+    if (changed && c) cvGoToStart(c);
   }
   function removeClip(c) {
     if (S.busy) return;
@@ -2721,7 +2752,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       if (isS) c.start = clamp(v, 0, Math.max(0, c.end - 1)); else c.end = clamp(v, c.start + 1, S.dur);
     }
     syncClip(c); markStale(c); syncPbDur();
-    if (!S.busy) { await seekTo(isS ? c.start : c.end - 0.1); requestPreview(); }
+    if (!S.busy) { setActive(c); cvVid.pause(); await seekTo(c.start); requestPreview(); }
   });
   const STEP = { size: [2, 66, 16, 400], lines: [1, 2, 0, 12], dx: [10, 0, -1200, 1200], dy: [10, 0, -1800, 1800] };
   function stepLayer(btn) {
@@ -2765,6 +2796,16 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   }
   function closeAllClipPreviews() {
     document.querySelectorAll('.clip').forEach(el => { const o = el._clip; if (o && o._prevOpen) closeClipPreview(o); });
+  }
+  // Redraws every open "Show this clip" picture, so edits to text or layout show even when that player is paused or finished.
+  function drawOpenInline() {
+    if (!prevVid) return;
+    S.clips.forEach(c => {
+      if (!c._prevOpen || c._prevRaf) return;
+      const cv = c.el.querySelector('.clipprev canvas'); if (!cv || prevVid.readyState < 2) return;
+      const ctx = cv.getContext('2d'), kx = cv.width / W, ky = cv.height / H;
+      ctx.save(); ctx.scale(kx, ky); drawComposite(ctx, c.layers, false, prevVid); ctx.restore();
+    });
   }
   function startPrevLoop(c, cv) {
     const ctx = cv.getContext('2d'), pv = prevVid;
@@ -2989,7 +3030,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       for (let i = 0; i < n; i++) {
         note.textContent = 'Looking at the video… ' + Math.round(i / n * 100) + '%';
         await seekTo(i * step);
-        cx.drawImage(vid, c0.x, c0.y, c0.w, c0.h, 0, 0, 64, 36);
+        cx.drawImage(cvVid, c0.x, c0.y, c0.w, c0.h, 0, 0, 64, 36);
         const d = cx.getImageData(0, 0, 64, 36).data, g = new Float32Array(64 * 36);
         for (let p = 0; p < g.length; p++) g[p] = d[p * 4] * 0.3 + d[p * 4 + 1] * 0.59 + d[p * 4 + 2] * 0.11;
         if (prev) {
@@ -3233,12 +3274,14 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     $('#fileInfo').textContent = v.file.name + ' · ' + S.vw + '×' + S.vh + ' · ' + fmt(S.dur) + ' · ' + mb(v.file.size);
     syncPbDur(); pbSeek.value = 0; pbCur.textContent = fmt(0);
     vid.playbackRate = 1;
+    if (!(await loadCv(v.url))) { v.failed = true; return false; }
     pbMenu.querySelectorAll('button[data-speed]').forEach(x => x.setAttribute('aria-pressed', x.dataset.speed === '1' ? 'true' : 'false'));
     $('#analyzeNote').textContent = v.score ? 'This video was analyzed for busy moments.' : 'Picks start at random places across the whole video and may overlap. Each press gives a new set.';
     updateButtons();
     if (!v.auto) { await detectCrop(); saveCur(); }
     else { setCropStatus('Bars were found for this video. Use the adjustments below if needed.', 'ok'); $('#cropStatus').dataset.crop = JSON.stringify(v.auto); await seekTo(0); updateCropBox(); requestPreview(); }
     renderVideoList();
+    cvGoToStart(S.active);
     return true;
   }
 
@@ -3268,7 +3311,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       if (videos.length) await useVideo(videos[0]);
       else {
         Object.assign(S, { url: null, vw: 0, vh: 0, dur: 0, auto: null, clips: [], active: null, sel: null, file: null, score: null, cuts: [] });
-        vid.removeAttribute('src'); vid.dataset.u = ''; vid.load();
+        vid.removeAttribute('src'); vid.dataset.u = ''; vid.load(); cvVid.removeAttribute('src'); cvVid._url = ''; cvVid.load();
         $('#playerWrap').hidden = true; $('#fileInfo').textContent = 'No video chosen yet. You can pick several at once.';
         setCropStatus('Choose a video and the bars are found automatically.'); $('#cropNums').textContent = '';
         retitle(); drawComposite(pctx, null, true);
@@ -3303,7 +3346,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     renderVideoList(); updateButtons();
   }
 
-  vid.addEventListener('timeupdate', () => { $('#nowTc').textContent = fmt(vid.currentTime); requestPreview(); });
+  vid.addEventListener('timeupdate', () => { $('#nowTc').textContent = fmt(vid.currentTime); });
   // iOS: leaving the native fullscreen player can leave the inline video painting
   // black. Nudge the playhead so iOS performs a real seek and repaints the frame.
   vid.addEventListener('webkitendfullscreen', () => {
@@ -3329,28 +3372,37 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const r = clipRange();
     pbDur.textContent = fmt(r ? r.e - r.s : (S.dur || 0));
   }
-  const syncPbPlay = () => { pbPlay.textContent = vid.paused ? '▶' : '⏸'; pbPlay.setAttribute('aria-label', vid.paused ? 'Play' : 'Pause'); };
-  // The clip end only stops playback when the clip's own preview button started it. The source video itself always plays freely.
-  let previewEnd = null;
+  const syncPbPlay = () => { pbPlay.textContent = cvVid.paused ? '▶' : '⏸'; pbPlay.setAttribute('aria-label', cvVid.paused ? 'Play' : 'Pause'); };
+  function updatePb() {
+    const r = clipRange(), t = cvVid.currentTime;
+    if (r) {
+      if (!scrubbing) pbSeek.value = Math.round(clamp((t - r.s) / (r.e - r.s), 0, 1) * 1000);
+      pbCur.textContent = fmt(clamp(t - r.s, 0, r.e - r.s));
+    } else {
+      if (!scrubbing && S.dur) pbSeek.value = Math.round((t / S.dur) * 1000);
+      pbCur.textContent = fmt(t);
+    }
+  }
   async function playPreview() {
     if (S.busy || !S.url) return;
     const r = clipRange();
-    if (r && (vid.currentTime < r.s - 0.05 || vid.currentTime >= r.e - 0.05)) {
+    if (r && (cvVid.currentTime < r.s - 0.05 || cvVid.currentTime >= r.e - 0.05)) { // at the end, or outside the clip: start again from the clip start
       try { await seekTo(r.s); } catch (x) { /* ignore */ }
     }
-    try { await vid.play(); if (r) previewEnd = r.e; } catch (e) { /* ignore */ }
+    if (!vid.paused) vid.pause(); // one sound at a time
+    try { await cvVid.play(); } catch (e) { /* ignore */ }
   }
   pbPlay.addEventListener('click', async () => {
     if (S.busy || !S.url) return;
-    if (vid.paused) playPreview(); else vid.pause();
+    if (cvVid.paused) playPreview(); else cvVid.pause();
   });
-  vid.addEventListener('play', syncPbPlay); vid.addEventListener('pause', syncPbPlay);
-  vid.addEventListener('pause', () => { previewEnd = null; });
-  vid.addEventListener('seeking', () => { previewEnd = null; });
+  cvVid.addEventListener('play', () => { syncPbPlay(); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); if (!playLoop && !S.busy) playLoop = requestAnimationFrame(loop); });
+  cvVid.addEventListener('pause', syncPbPlay);
+  vid.addEventListener('play', () => { if (!cvVid.paused && !S.busy) cvVid.pause(); }); // starting the source silences the canvas player
   pbMute.addEventListener('click', () => {
-    vid.muted = !vid.muted;
-    pbMute.textContent = vid.muted ? '🔇' : '🔊';
-    pbMute.setAttribute('aria-label', vid.muted ? 'Unmute' : 'Mute');
+    cvVid.muted = !cvVid.muted;
+    pbMute.textContent = cvVid.muted ? '🔇' : '🔊';
+    pbMute.setAttribute('aria-label', cvVid.muted ? 'Unmute' : 'Mute');
   });
   let scrubbing = false;
   pbSeek.addEventListener('pointerdown', () => { scrubbing = true; });
@@ -3366,34 +3418,19 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     if (r) seekTo(r.s + frac * (r.e - r.s));
     else if (S.dur) seekTo(frac * S.dur);
   });
-  vid.addEventListener('timeupdate', () => {
-    const r = clipRange(), t = vid.currentTime;
-    if (r) {
-      if (previewEnd !== null && !vid.paused && t >= previewEnd - 0.04) { // clip preview reached its end
-        const end = previewEnd; previewEnd = null;
-        vid.pause();
-        if (t > end + 0.05) { try { vid.currentTime = end; } catch (x) { /* ignore */ } }
-      }
-      if (!scrubbing) pbSeek.value = Math.round(clamp((t - r.s) / (r.e - r.s), 0, 1) * 1000);
-      pbCur.textContent = fmt(clamp(t - r.s, 0, r.e - r.s));
-    } else {
-      if (!scrubbing && S.dur) pbSeek.value = Math.round((t / S.dur) * 1000);
-      pbCur.textContent = fmt(t);
-    }
-  });
+  cvVid.addEventListener('timeupdate', () => { if (!S.busy) updatePb(); requestPreview(); });
   $('#pbMenuBtn').addEventListener('click', e => { e.stopPropagation(); pbMenu.hidden = !pbMenu.hidden; });
   document.addEventListener('click', e => {
     if (!pbMenu.hidden && !e.target.closest('#pbMenu') && !e.target.closest('#pbMenuBtn')) pbMenu.hidden = true;
   });
   pbMenu.addEventListener('click', e => {
     const b = e.target.closest('button[data-speed]'); if (!b) return;
-    vid.playbackRate = parseFloat(b.dataset.speed);
+    cvVid.playbackRate = parseFloat(b.dataset.speed);
     pbMenu.querySelectorAll('button[data-speed]').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
     pbMenu.hidden = true;
   });
-  vid.addEventListener('seeked', requestPreview);
-  vid.addEventListener('loadeddata', requestPreview);
-  vid.addEventListener('play', () => { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); if (!playLoop && !S.busy) playLoop = requestAnimationFrame(loop); });
+  cvVid.addEventListener('seeked', () => { requestPreview(); updatePb(); });
+  cvVid.addEventListener('loadeddata', requestPreview);
 
   /* ---------- scene notes: mark start/end while watching, turn them into clips ---------- */
   const escapeHtml = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -3489,7 +3526,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       audioCtx = new AC();
-      const src = audioCtx.createMediaElementSource(vid);
+      const src = audioCtx.createMediaElementSource(cvVid);
       monitor = audioCtx.createGain(); recDest = audioCtx.createMediaStreamDestination();
       src.connect(monitor); monitor.connect(audioCtx.destination); src.connect(recDest);
       return true;
@@ -3690,7 +3727,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     try { lock = navigator.wakeLock && await navigator.wakeLock.request('screen'); } catch (e) { /* optional */ }
     try {
       if (resumed) await resumed;
-      vid.controls = false; vid.pause();
+      cvVid.pause();
       await seekTo(start);
       await Promise.all(c.layers.map(l => loadFontFor(l.font)));
       drawComposite(pctx, c.layers, false);
@@ -3704,25 +3741,25 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const chunks = [];
       rec.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
       const stopped = new Promise(r => { rec.onstop = r; });
-      try { await vid.play(); } catch (e) { await new Promise(r => setTimeout(r, 400)); await vid.play(); }
+      try { await cvVid.play(); } catch (e) { await new Promise(r => setTimeout(r, 400)); await cvVid.play(); }
       rec.start(500);
       noteOf(c, 'Recording…');
       const t0 = performance.now();
       await new Promise(resolve => {
         let frame = 0, timer = 0;
         const finish = () => { cancelAnimationFrame(frame); clearInterval(timer); resolve(); };
-        const done = () => S.cancel || vid.ended || vid.currentTime >= end - 0.02 || performance.now() - t0 > (end - start + 15) * 1000;
+        const done = () => S.cancel || cvVid.ended || cvVid.currentTime >= end - 0.02 || performance.now() - t0 > (end - start + 15) * 1000;
         const tick = () => {
           drawComposite(pctx, c.layers, false);
-          const p = clamp((vid.currentTime - start) / (end - start), 0, 1);
+          const p = clamp((cvVid.currentTime - start) / (end - start), 0, 1);
           c.bar.style.width = (p * 100).toFixed(1) + '%';
-          c.note.textContent = (batch ? batch + ' · ' : '') + 'Recording ' + (vid.currentTime - start).toFixed(1) + ' of ' + (end - start).toFixed(1) + ' s';
+          c.note.textContent = (batch ? batch + ' · ' : '') + 'Recording ' + (cvVid.currentTime - start).toFixed(1) + ' of ' + (end - start).toFixed(1) + ' s';
           if (done()) finish(); else frame = requestAnimationFrame(tick);
         };
         timer = setInterval(() => { if (done()) finish(); }, 120);
         frame = requestAnimationFrame(tick);
       });
-      vid.pause();
+      cvVid.pause();
       drawComposite(pctx, c.layers, false);
       await new Promise(r => setTimeout(r, 120));
       try { rec.requestData(); } catch (e) { /* ignore */ }
@@ -3743,7 +3780,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       noteOf(c, 'Recording failed. ' + (e && e.name === 'NotAllowedError' ? 'The browser blocked playback; tap Make clip again.' : 'Try again, or choose a shorter clip.'), 'bad');
     } finally {
       if (monitor) monitor.gain.value = 1;
-      vid.controls = true; vid.pause();
+      cvVid.pause();
       try { lock && lock.release(); } catch (e) { /* ignore */ }
       S.busy = false; $('#banner').hidden = true; $('#stopBtn').hidden = true; updateButtons();
       await seekTo(c.start); requestPreview();
