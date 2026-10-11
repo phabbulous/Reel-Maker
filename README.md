@@ -2,7 +2,7 @@
 
 Turn any video into 9:16 reels in your browser. Reel Maker crops off the bars and burned-in captions, centres the scene on a canvas you choose, adds your own on-screen text, cuts random clips, and gives you MP4 files. Everything runs on your device. Your videos are never uploaded.
 
-Version 4.6 · one file: `index.html` · no install, no account, free.
+Version 4.7 · one file: `index.html` · no install, no account, free.
 
 ---
 
@@ -27,6 +27,7 @@ Version 4.6 · one file: `index.html` · no install, no account, free.
 - **Text:** several texts per clip, 14 fonts (Inter, Noto Sans Bold, Bebas Neue, Oswald, Oswald Bold, Mukta, Albert Sans, Archivo, Archivo Black, Epilogue, Hind Siliguri, Luckiest Guy, Montserrat Black, Anton). Place it above or below the video, at the top or bottom of the screen, or in the middle. Set size and lines, and move it with − and + or by dragging the preview.
 - **Text lines:** paste one line per clip and apply them all at once, shuffled if you like.
 - **Canvas:** 9:16, 1:1, 4:5 or 16:9. Any background colour (picker, swatches, full palette), or a blurred copy of the video. Move and resize the video on the canvas.
+- **Start and End nudge buttons (v4.7):** next to every Start and End box (and on noted moments) are -1s and +1s buttons. Hold one to keep stepping. Start can't pass End, and a clip stays at least 1 second long.
 - **Preview player:** play, mute, seek, and 0.5x to 2x speed. The play button previews the selected clip and stops at its end. The source video above always plays freely, past any clip. The two are fully separate (v4.6): playing one pauses the other, and changing a clip's start or end jumps the preview to the new start without touching the source video. Text edits redraw the preview, also after a clip has finished.
 
 ---

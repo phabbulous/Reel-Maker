@@ -118,6 +118,9 @@ input[type="number"] { text-align: center; font-family: var(--font-mono); }
 .tkeys { display: flex; gap: 4px; }
 .tkey { min-width: 32px; height: 34px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: 600 16px var(--font-ui); cursor: pointer; }
 .tkey:active { background: var(--accent); color: #fff; }
+.tstep { min-width: 40px; height: 34px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: 700 13px var(--font-ui); cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.tstep:active { background: var(--accent); color: #fff; }
+.timefield { flex-wrap: wrap; }
 .timefield label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); min-width: 0; }
 .timefield input { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .textfield { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
@@ -2651,8 +2654,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     el.innerHTML =
       '<div class="clip-head"><h3></h3><span class="dur"></span><button type="button" class="btn quiet small" data-act="remove">Remove</button></div>' +
       '<div class="times">' +
-        '<div class="timefield"><label for="s' + id + '">Start<input id="s' + id + '" type="text" inputmode="decimal" autocomplete="off"></label><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey="." aria-label="Insert dot">.</button></span><button type="button" class="btn small" data-act="set-start">Use now</button></div>' +
-        '<div class="timefield"><label for="e' + id + '">End<input id="e' + id + '" type="text" inputmode="decimal" autocomplete="off"></label><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey="." aria-label="Insert dot">.</button></span><button type="button" class="btn small" data-act="set-end">Use now</button></div>' +
+        '<div class="timefield"><label for="s' + id + '">Start<input id="s' + id + '" type="text" inputmode="decimal" autocomplete="off"></label><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey="." aria-label="Insert dot">.</button><button type="button" class="tstep" data-tstep="-1" aria-label="Back 1 second">−1s</button><button type="button" class="tstep" data-tstep="1" aria-label="Forward 1 second">+1s</button></span><button type="button" class="btn small" data-act="set-start">Use now</button></div>' +
+        '<div class="timefield"><label for="e' + id + '">End<input id="e' + id + '" type="text" inputmode="decimal" autocomplete="off"></label><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey="." aria-label="Insert dot">.</button><button type="button" class="tstep" data-tstep="-1" aria-label="Back 1 second">−1s</button><button type="button" class="tstep" data-tstep="1" aria-label="Forward 1 second">+1s</button></span><button type="button" class="btn small" data-act="set-end">Use now</button></div>' +
       '</div>' +
       '<div class="layers listcol"></div>' +
       '<div class="actions"><button type="button" class="btn small" data-act="add-layer">Add another text</button><button type="button" class="btn small" data-act="look">Show this clip</button><button type="button" class="btn primary small" data-act="make">Make clip</button></div>' +
@@ -3450,8 +3453,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const s = n.s != null ? n.s : n.t, e = n.e;
       const d = document.createElement('div'); d.className = 'noteitem';
       d.innerHTML =
-        '<label class="ntime"><span class="nlbl">Start</span><span class="nfield"><input type="text" inputmode="decimal" data-ns="' + i + '" value="' + fmt(s) + '" autocomplete="off" aria-label="Note start time"><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey=".">.</button></span></span></label>' +
-        '<label class="ntime"><span class="nlbl">End</span><span class="nfield"><input type="text" inputmode="decimal" data-ne="' + i + '" value="' + (e == null ? '' : fmt(e)) + '" placeholder="Set end time" autocomplete="off" aria-label="Note end time"><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey=".">.</button></span></span></label>' +
+        '<label class="ntime"><span class="nlbl">Start</span><span class="nfield"><input type="text" inputmode="decimal" data-ns="' + i + '" value="' + fmt(s) + '" autocomplete="off" aria-label="Note start time"><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey=".">.</button><button type="button" class="tstep" data-nstep="-1" data-nk="s" data-ni="' + i + '">−1s</button><button type="button" class="tstep" data-nstep="1" data-nk="s" data-ni="' + i + '">+1s</button></span></span></label>' +
+        '<label class="ntime"><span class="nlbl">End</span><span class="nfield"><input type="text" inputmode="decimal" data-ne="' + i + '" value="' + (e == null ? '' : fmt(e)) + '" placeholder="Set end time" autocomplete="off" aria-label="Note end time"><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey=".">.</button><button type="button" class="tstep" data-nstep="-1" data-nk="e" data-ni="' + i + '">−1s</button><button type="button" class="tstep" data-nstep="1" data-nk="e" data-ni="' + i + '">+1s</button></span></span></label>' +
         '<input type="text" data-nl="' + i + '" placeholder="What happens here? (optional)" maxlength="80" value="' + escapeHtml(n.label) + '" autocomplete="off">' +
         '<button type="button" class="btn small" data-nclip="' + i + '">Clip here</button>' +
         '<button type="button" class="btn quiet small" data-ndel="' + i + '" aria-label="Delete note">Remove</button>';
@@ -3519,6 +3522,50 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     }
     renderNotes();
   });
+
+
+  /* +1s / -1s buttons on clip Start/End (hold to repeat) and on noted moments. */
+  let stepSeekT = 0;
+  function afterTimeStep(c, isStart) {
+    syncClip(c); markStale(c); syncPbDur();
+    clearTimeout(stepSeekT);
+    stepSeekT = setTimeout(async () => {
+      if (S.busy) return;
+      setActive(c); cvVid.pause();
+      await seekTo(isStart ? c.start : Math.max(c.start, c.end - 0.05));
+      requestPreview();
+    }, 160);
+  }
+  function stepClipTime(btn) {
+    const c = btn.closest('.clip')._clip; if (!c || S.busy) return;
+    const isStart = !!btn.closest('.timefield').querySelector('input[id^="s"]'), d = parseInt(btn.dataset.tstep, 10);
+    if (isStart) c.start = clamp(c.start + d, 0, Math.max(0, c.end - 1));
+    else c.end = clamp(c.end + d, Math.min(S.dur, c.start + 1), S.dur);
+    afterTimeStep(c, isStart);
+  }
+  function stepNoteTime(k, i, d) {
+    if (!cur || S.busy) return; const n = cur.notes[i]; if (!n) return;
+    if (k === 's') { n.s = clamp((n.s != null ? n.s : n.t || 0) + d, 0, n.e != null ? Math.max(0, n.e - 1) : S.dur); }
+    else { const s0 = n.s != null ? n.s : (n.t || 0); n.e = clamp((n.e != null ? n.e : s0) + d, Math.min(S.dur, s0 + 1), S.dur); if (pendingNote === n) resetNoteBtn(); }
+    renderNotes();
+    vid.currentTime = k === 's' ? n.s : Math.max(0, n.e - 0.05);
+  }
+  let tholdT = 0, tholdI = 0;
+  const stopTHold = () => { clearTimeout(tholdT); clearInterval(tholdI); tholdT = tholdI = 0; };
+  function startTHold(fn) { fn(); tholdT = setTimeout(() => { tholdI = setInterval(fn, 120); }, 450); }
+  list.addEventListener('pointerdown', e => {
+    const b = e.target.closest('button.tstep'); if (!b) return;
+    e.preventDefault(); startTHold(() => stepClipTime(b));
+  });
+  $('#noteList').addEventListener('pointerdown', e => {
+    const b = e.target.closest('button.tstep'); if (!b) return;
+    e.preventDefault(); const k = b.dataset.nk, i = +b.dataset.ni, d = +b.dataset.nstep;
+    startTHold(() => stepNoteTime(k, i, d));
+  });
+  ['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, stopTHold));
+  window.addEventListener('blur', stopTHold);
+  list.addEventListener('click', e => { const b = e.target.closest('button.tstep'); if (b && e.detail === 0) stepClipTime(b); });
+  $('#noteList').addEventListener('click', e => { const b = e.target.closest('button.tstep'); if (b && e.detail === 0) stepNoteTime(b.dataset.nk, +b.dataset.ni, +b.dataset.nstep); });
 
   /* ---------- recording ---------- */
   function ensureAudio() {
