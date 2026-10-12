@@ -3857,9 +3857,61 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const chunks = [];
       rec.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
       const stopped = new Promise(r => { rec.onstop = r; });
+      // Resolves once the video element is genuinely presenting fresh frames.
+      // play() resolving doesn't mean the first frame has rendered: on a cold
+      // decoder the canvas can sit on a stale frame while the audio clock is
+      // already running, baking a permanent audio-ahead offset into the clip.
+      // requestVideoFrameCallback is the ideal signal; where it's unavailable
+      // (iOS Safari) we fall back to clock motion plus changing canvas pixels.
+      const waitVideoLive = (maxMs) => new Promise(res => {
+        maxMs = maxMs || 2500;
+        const w0 = performance.now();
+        let settled = false;
+        const done = () => { if (!settled) { settled = true; res(); } };
+        const to = setTimeout(done, maxMs);
+        if (S.cancel) { clearTimeout(to); done(); return; }
+        if (typeof cvVid.requestVideoFrameCallback === 'function') {
+          try { cvVid.requestVideoFrameCallback(() => { clearTimeout(to); done(); }); return; }
+          catch (e) { /* fall through to the fallback */ }
+        }
+        const t0 = cvVid.currentTime;
+        const sig = () => {
+          drawComposite(pctx, c.layers, false);
+          try {
+            // Sample the middle of the canvas: the video sits centered, the
+            // corners are usually just the black background.
+            const d = pctx.getImageData(Math.max(0, (W >> 1) - 32), Math.max(0, (H >> 1) - 18), 64, 36).data;
+            let s = 7;
+            for (let i = 0; i < d.length; i += 32) s = (s * 31 + d[i]) % 1000003;
+            return s;
+          } catch (e) { return -1; }
+        };
+        let last = sig();
+        const chk = () => {
+          if (settled) return;
+          const s = sig();
+          const changed = last >= 0 && s >= 0 && s !== last;
+          last = s;
+          if ((cvVid.currentTime > t0 + 1 / 30 && changed) || S.cancel || performance.now() - w0 > maxMs) { clearTimeout(to); done(); }
+          else requestAnimationFrame(chk);
+        };
+        chk();
+      });
       try { await cvVid.play(); } catch (e) { await new Promise(r => setTimeout(r, 400)); await cvVid.play(); }
+      // Warm-up (not recorded): play through the cold-decoder preroll, during
+      // which the audio clock can run ahead of the first presented video
+      // frames and bake a permanent audio-ahead offset into the clip.
+      await waitVideoLive(2500);
+      if (S.cancel) throw new Error('cancelled');
+      // Rewind cleanly (paused, so the seek is cheap), then start the recorder
+      // BEFORE playback resumes: any residual preroll then holds the start
+      // frame and silence on both tracks identically, keeping them aligned.
+      cvVid.pause();
+      await seekTo(start);
+      drawComposite(pctx, c.layers, false);
       rec.start(500);
       noteOf(c, 'Recording…');
+      try { await cvVid.play(); } catch (e) { await new Promise(r => setTimeout(r, 400)); await cvVid.play(); }
       const t0 = performance.now();
       await new Promise(resolve => {
         let frame = 0, timer = 0;
