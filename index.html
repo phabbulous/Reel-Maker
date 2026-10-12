@@ -7,7 +7,7 @@
 <style>[hidden]{display:none!important}body{margin:0}</style>
 </head>
 <body>
-<title>Reel Maker v4.9</title>
+<title>Reel Maker v4.10</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@700&family=Noto+Sans:wght@700&family=Bebas+Neue&family=Oswald:wght@400;700&family=Mukta:wght@700&family=Albert+Sans:wght@700&family=Archivo+Black&family=Archivo:wght@700&family=Epilogue:wght@700&family=Hind+Siliguri:wght@700&family=Luckiest+Guy&family=Montserrat:wght@900&family=Anton&display=swap">
@@ -148,10 +148,11 @@ textarea { resize: vertical; min-height: 64px; line-height: 1.35; }
 @media (prefers-reduced-motion: no-preference) { .bar > i { transition: width 0.2s linear; } }
 
 .vlist { display: grid; gap: 6px; }
-.vitem { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px; background: var(--field); }
+.vitem { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px; background: var(--field); }
 .vitem.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .vitem input { width: 20px; height: 20px; }
 .vitem .vname { text-align: left; justify-content: flex-start; overflow-wrap: anywhere; font-weight: 500; }
+.vitem input.vname-in { width: 100%; height: 34px; font: 500 13px var(--font-ui); }
 .layer { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--field); }
 .layer details summary { cursor: pointer; font-size: 13px; color: var(--accent); min-height: 32px; display: flex; align-items: center; }
 .lgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin: 6px 0; }
@@ -199,7 +200,7 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
 
 <div class="app">
   <header>
-    <h1>Reel Maker <span class="meta">v4.6</span></h1>
+    <h1>Reel Maker <span class="meta">v4.10</span></h1>
     <p class="lede">Crops the bars off your videos, centers the scene on a black 9:16 canvas and puts your text on it. Your videos stay on this device.</p>
     <details class="canvasbox" id="diag" style="margin-top:8px"><summary>Check this browser</summary>
       <p class="hint">Not sure why something fails on one browser? This shows what this browser can do. Take a screenshot to compare browsers or send it to me.</p>
@@ -3320,11 +3321,17 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = v.include || videos.length === 1; cb.disabled = videos.length === 1; cb.setAttribute('aria-label', 'Use ' + v.name);
       cb.addEventListener('change', () => { v.include = cb.checked; });
       const nm = document.createElement('button'); nm.type = 'button'; nm.className = 'btn quiet vname';
-      nm.textContent = v.name + (v.dur ? ' · ' + fmt(v.dur) : '') + ' · ' + v.clips.length + (v.clips.length === 1 ? ' clip' : ' clips');
+      nm.textContent = (v.customName || v.name) + (v.dur ? ' · ' + fmt(v.dur) : '') + ' · ' + v.clips.length + (v.clips.length === 1 ? ' clip' : ' clips');
       nm.addEventListener('click', async () => { if (!S.busy && v !== cur) await useVideo(v); });
+      const cn = document.createElement('input'); cn.type = 'text'; cn.className = 'vname-in';
+      cn.placeholder = v.name; cn.value = v.customName || ''; cn.setAttribute('aria-label', 'Name for ' + v.name); cn.autocomplete = 'off';
+      cn.addEventListener('change', () => {
+        v.customName = cn.value.trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').slice(0, 80);
+        renderVideoList(); updateButtons();
+      });
       const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'btn quiet small'; rm.textContent = 'Remove';
       rm.addEventListener('click', () => removeVideo(v));
-      row.append(cb, nm, rm); box.appendChild(row);
+      row.append(cb, nm, cn, rm); box.appendChild(row);
     });
   }
   async function removeVideo(v) {
@@ -3932,7 +3939,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const inp = c.el && c.el.querySelector('input.fname');
     const custom = inp ? inp.value.trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').replace(/\.(mp4|webm|mov|m4v)$/i, '') : '';
     if (custom) return custom + '.' + c.ext;
-    return c.v.name + '-clip' + (c.v.clips.indexOf(c) + 1) + '.' + c.ext;
+    const base = (c.v.customName || c.v.name || 'video');
+    return base + ' - clip ' + (c.v.clips.indexOf(c) + 1) + '.' + c.ext;
   };
   function anchorDownload(c) {
     const url = URL.createObjectURL(c.blob), a = document.createElement('a');
