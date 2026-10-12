@@ -7,7 +7,7 @@
 <style>[hidden]{display:none!important}body{margin:0}</style>
 </head>
 <body>
-<title>Reel Maker v4.6</title>
+<title>Reel Maker v4.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@700&family=Noto+Sans:wght@700&family=Bebas+Neue&family=Oswald:wght@400;700&family=Mukta:wght@700&family=Albert+Sans:wght@700&family=Archivo+Black&family=Archivo:wght@700&family=Epilogue:wght@700&family=Hind+Siliguri:wght@700&family=Luckiest+Guy&family=Montserrat:wght@900&family=Anton&display=swap">
@@ -121,12 +121,21 @@ input[type="number"] { text-align: center; font-family: var(--font-mono); }
 .tstep { min-width: 40px; height: 34px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: 700 13px var(--font-ui); cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 .tstep:active { background: var(--accent); color: #fff; }
 .timefield { flex-wrap: wrap; }
-.timefield label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); min-width: 0; }
+.timeapply { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.timemsg { font-size: 12px; color: var(--muted); }
+.resbtns .fname { flex: 1 1 150px; }
+#clipList[data-busy]::before { content: 'Making a clip. The buttons below unlock when it finishes.'; display: block; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.timefield label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); min-width: 0; grid-column: 1 / -1; }
+.timefield .tkeys { flex-wrap: nowrap; gap: 3px; }
+.timefield .tkey { min-width: 26px; padding: 0 5px; }
+.timefield .tstep { min-width: 34px; padding: 0 5px; font-size: 12px; }
+.timefield > .btn { padding-left: 8px; padding-right: 8px; font-size: 13px; }
+.clip-head { flex-wrap: wrap; }
+.timefield > .btn { white-space: nowrap; }
 .timefield input { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .textfield { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
 textarea { resize: vertical; min-height: 64px; line-height: 1.35; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.resbtns .fname { flex: 1 1 150px; }
 .res { display: grid; gap: 8px; border-top: 1px dashed var(--line); padding-top: 10px; }
 .bar { height: 6px; background: var(--field); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
 .bar > i { display: block; height: 100%; width: 0; background: var(--accent); }
@@ -2653,11 +2662,12 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const id = ++seq, el = document.createElement('article');
     el.className = 'clip';
     el.innerHTML =
-      '<div class="clip-head"><h3></h3><span class="dur"></span><button type="button" class="btn quiet small" data-act="remove">Remove</button></div>' +
+      '<div class="clip-head"><h3></h3><span class="dur"></span><button type="button" class="btn quiet small" data-act="dup">Duplicate</button><button type="button" class="btn quiet small" data-act="remove">Remove</button></div>' +
       '<div class="times">' +
-        '<div class="timefield"><label for="s' + id + '">Start<input id="s' + id + '" type="text" inputmode="decimal" autocomplete="off"></label><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey="." aria-label="Insert dot">.</button><button type="button" class="tstep" data-tstep="-1" aria-label="Back 1 second">−1s</button><button type="button" class="tstep" data-tstep="1" aria-label="Forward 1 second">+1s</button></span><button type="button" class="btn small" data-act="set-start">Use now</button></div>' +
-        '<div class="timefield"><label for="e' + id + '">End<input id="e' + id + '" type="text" inputmode="decimal" autocomplete="off"></label><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey="." aria-label="Insert dot">.</button><button type="button" class="tstep" data-tstep="-1" aria-label="Back 1 second">−1s</button><button type="button" class="tstep" data-tstep="1" aria-label="Forward 1 second">+1s</button></span><button type="button" class="btn small" data-act="set-end">Use now</button></div>' +
+        '<div class="timefield"><label for="s' + id + '">Start<input id="s' + id + '" type="text" inputmode="decimal" autocomplete="off"></label><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey="." aria-label="Insert dot">.</button><button type="button" class="tstep" data-tstep="-1" aria-label="Back 1 second">−1s</button><button type="button" class="tstep" data-tstep="1" aria-label="Forward 1 second">+1s</button></span><button type="button" class="btn small" data-act="set-start">Set start here</button></div>' +
+        '<div class="timefield"><label for="e' + id + '">End<input id="e' + id + '" type="text" inputmode="decimal" autocomplete="off"></label><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey="." aria-label="Insert dot">.</button><button type="button" class="tstep" data-tstep="-1" aria-label="Back 1 second">−1s</button><button type="button" class="tstep" data-tstep="1" aria-label="Forward 1 second">+1s</button></span><button type="button" class="btn small" data-act="set-end">Set end here</button></div>' +
       '</div>' +
+      '<div class="timeapply"><button type="button" class="btn primary small" data-act="use-times">Use now</button><span class="timemsg" role="status"></span></div>' +
       '<div class="layers listcol"></div>' +
       '<div class="actions"><button type="button" class="btn small" data-act="add-layer">Add another text</button><button type="button" class="btn small" data-act="look">Show this clip</button><button type="button" class="btn primary small" data-act="make">Make clip</button></div>' +
       '<div class="clipprev" hidden><canvas width="360" height="640"></canvas><span class="hint">Tap the preview to pause or play.</span><div class="row"><button type="button" class="btn small" data-act="replay">Replay</button><button type="button" class="btn small" data-act="hideprev">Close</button></div></div>' +
@@ -2676,7 +2686,9 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     return c;
   }
   function syncClip(c) {
-    c.inS.value = fmt(c.start); c.inE.value = fmt(c.end);
+    // Never rewrite a box you are typing in (blurring Start used to overwrite End while it was being edited).
+    if (document.activeElement !== c.inS) c.inS.value = fmt(c.start);
+    if (document.activeElement !== c.inE) c.inE.value = fmt(c.end);
     const d = c.end - c.start;
     c.dur.textContent = d.toFixed(1) + ' s';
     c.dur.classList.toggle('short', d < 20);
@@ -2753,7 +2765,14 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     if (!isS && !isE) return;
     const v = parse(e.target.value);
     if (isFinite(v)) {
-      if (isS) c.start = clamp(v, 0, Math.max(0, c.end - 1)); else c.end = clamp(v, c.start + 1, S.dur);
+      if (isS) {
+        // Start moved past the old End: slide the clip along, keeping its length (instead of squashing Start back).
+        if (v > c.end - 1) { const len = Math.max(1, c.end - c.start); c.start = clamp(v, 0, Math.max(0, S.dur - 1)); c.end = Math.min(S.dur, c.start + len); }
+        else c.start = clamp(v, 0, Math.max(0, c.end - 1));
+      } else {
+        if (v < c.start + 1) { const len = Math.max(1, c.end - c.start); c.end = clamp(v, 1, S.dur); c.start = Math.max(0, c.end - len); }
+        else c.end = clamp(v, c.start + 1, S.dur);
+      }
     }
     syncClip(c); markStale(c); syncPbDur();
     if (!S.busy) { setActive(c); cvVid.pause(); await seekTo(c.start); requestPreview(); }
@@ -2787,6 +2806,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       prevVid = document.createElement('video');
       prevVid.playsInline = true; prevVid.preload = 'auto'; prevVid.style.display = 'none';
       document.body.appendChild(prevVid);
+      prevVid.addEventListener('play', () => { lastPlayer = 'prev'; });
     }
     return prevVid;
   }
@@ -2910,8 +2930,10 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const btn = e.target.closest('button[data-act]'); if (!btn) return;
     const c = btn.closest('.clip')._clip, act = btn.dataset.act, lay = btn.closest('.layer');
     if (act === 'remove') return removeClip(c);
-    if (act === 'set-start') { c.start = clamp(cvVid.currentTime, 0, S.dur); if (c.end < c.start + 1) c.end = Math.min(S.dur, c.start + minLen()); syncClip(c); markStale(c); setActive(c); return; }
-    if (act === 'set-end') { c.end = clamp(cvVid.currentTime, 0, S.dur); if (c.start > c.end - 1) c.start = Math.max(0, c.end - minLen()); syncClip(c); markStale(c); setActive(c); return; }
+    if (act === 'set-start') { c.start = clamp(playheadNow(), 0, S.dur); if (c.end < c.start + 1) c.end = Math.min(S.dur, c.start + minLen()); afterTimeStep(c, true); return; }
+    if (act === 'set-end') { c.end = clamp(playheadNow(), 0, S.dur); if (c.start > c.end - 1) c.start = Math.max(0, c.end - minLen()); afterTimeStep(c, false); return; }
+    if (act === 'use-times') { useTimes(c); return; }
+    if (act === 'dup') { dupClip(c); return; }
     if (act === 'look') { if (S.busy) return; toggleClipPreview(c); return; }
     if (act === 'replay') { replayClipPreview(c); return; }
     if (act === 'hideprev') { closeClipPreview(c); return; }
@@ -2950,7 +2972,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     if (!cur) return;
     const lo = Math.min(minLen(), S.dur), hi = Math.max(lo, numOr('#qMax', S.dur));
     const len = Math.min(S.dur, r1(rand(lo, hi)));
-    const s = clamp(vid.currentTime, 0, Math.max(0, S.dur - len));
+    const s = clamp(playheadNow(), 0, Math.max(0, S.dur - len));
     setActive(addClip(cur, r1(s), r1(Math.min(S.dur, s + len)), null));
   });
   $('#fullBtn').addEventListener('click', () => {
@@ -3350,6 +3372,18 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     renderVideoList(); updateButtons();
   }
 
+  /* "Use now", "Note this moment" and "add clip here" read the player you touched last:
+     the source video, the canvas preview bar, or a clip's "Show this clip" player. */
+  let lastPlayer = 'src';
+  function playheadNow() {
+    let t = vid.currentTime;
+    if (lastPlayer === 'cv' && cvVid.readyState > 0) t = cvVid.currentTime;
+    else if (lastPlayer === 'prev' && prevVid && prevVid.readyState > 0) t = prevVid.currentTime;
+    return isFinite(t) ? t : 0;
+  }
+  vid.addEventListener('play', () => { lastPlayer = 'src'; });
+  vid.addEventListener('seeked', () => { lastPlayer = 'src'; });
+  cvVid.addEventListener('play', () => { if (!S.busy) lastPlayer = 'cv'; });
   vid.addEventListener('timeupdate', () => { $('#nowTc').textContent = fmt(vid.currentTime); });
   // iOS: leaving the native fullscreen player can leave the inline video painting
   // black. Nudge the playhead so iOS performs a real seek and repaints the frame.
@@ -3409,6 +3443,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     pbMute.setAttribute('aria-label', cvVid.muted ? 'Unmute' : 'Mute');
   });
   let scrubbing = false;
+  pbSeek.addEventListener('input', () => { lastPlayer = 'cv'; });
   pbSeek.addEventListener('pointerdown', () => { scrubbing = true; });
   pbSeek.addEventListener('pointerup', () => { scrubbing = false; });
   pbSeek.addEventListener('pointercancel', () => { scrubbing = false; });
@@ -3464,7 +3499,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   }
   noteBtn.addEventListener('click', () => {
     if (!cur || !S.dur || S.busy) return;
-    const now = Math.round(vid.currentTime * 10) / 10;
+    const now = Math.round(playheadNow() * 10) / 10;
     cur.notes = cur.notes || [];
     if (!pendingNote || pendingNote.v !== cur || pendingNote.e != null) {
       pendingNote = { v: cur, s: now, e: null, label: '' };
@@ -3525,6 +3560,31 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   });
 
 
+  /* "Use now": make the Start and End in this clip's boxes the clip's real times. Reads the boxes, never a video player. */
+  function useTimes(c) {
+    if (S.busy) return;
+    let st = parse(c.inS.value), en = parse(c.inE.value);
+    if (!isFinite(st)) st = c.start;
+    if (!isFinite(en)) en = c.end;
+    st = clamp(st, 0, Math.max(0, S.dur - 1));
+    en = clamp(en, st + 1, S.dur);
+    if (en - st < 1) st = Math.max(0, en - 1);
+    const changed = Math.abs(st - c.start) > 0.001 || Math.abs(en - c.end) > 0.001;
+    c.start = st; c.end = en;
+    syncClip(c); markStale(c); syncPbDur();
+    const msg = c.el.querySelector('.timemsg');
+    const n = S.clips.indexOf(c) + 1;
+    if (msg) msg.textContent = 'Clip ' + n + ' is now ' + fmt(st) + ' to ' + fmt(en) + '.' + (c.blob ? ' Tap Make clip to build it again.' : '');
+    setActive(c); cvVid.pause();
+    seekTo(st).then(requestPreview, () => {});
+  }
+  function dupClip(c) {
+    if (S.busy) return;
+    const v = c.v, n = addClip(v, c.start, c.end, c.layers);
+    v.clips.splice(v.clips.indexOf(n), 1); v.clips.splice(v.clips.indexOf(c) + 1, 0, n);
+    c.el.after(n.el); retitle(v); renderVideoList(); setActive(n);
+    n.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
   /* +1s / -1s buttons on clip Start/End (hold to repeat) and on noted moments. */
   let stepSeekT = 0;
   function afterTimeStep(c, isStart) {
@@ -3691,7 +3751,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       }
       await aEnc.flush();
       if (encErr) throw encErr;
-      if (!aChunks) throw new Error('noaudio'); // encoder gave no audio: fall back to the normal recorder
+      if (!aChunks) throw new Error('noaudio'); // encoder gave no audio: use the normal recorder instead
       // Video: seek, composite, encode — as fast as the decoder can go, no realtime wait.
       const ft = Math.round(1e6 / FPS), keyEvery = FPS * 2;
       for (let i = 0; i < total; i++) {
@@ -3870,7 +3930,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
 
   const clipName = c => {
     const inp = c.el && c.el.querySelector('input.fname');
-    const custom = inp ? inp.value.trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').replace(/\.[a-z0-9]{2,5}$/i, '') : '';
+    const custom = inp ? inp.value.trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').replace(/\.(mp4|webm|mov|m4v)$/i, '') : '';
     if (custom) return custom + '.' + c.ext;
     return c.v.name + '-clip' + (c.v.clips.indexOf(c) + 1) + '.' + c.ext;
   };
@@ -3931,16 +3991,48 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   /* ---------- button state ---------- */
   function updateButtons() {
     const has = !!S.url && S.vw > 0, idle = !S.busy;
+    $('#clipList').toggleAttribute('data-busy', !idle);
     ['#addClip', '#quickFill', '#fullBtn', '#analyze', '#redetect'].forEach(q => { $(q).disabled = !has || !idle; });
     ['#pbPlay', '#pbMute', '#pbSeek', '#pbMenuBtn'].forEach(q => { $(q).disabled = !has || !idle; });
     $('#makeAll').disabled = !videos.length || !idle;
     $('#applyLines').disabled = !S.clips.length;
     $('#trims').querySelectorAll('button,input').forEach(x => { x.disabled = !has || !idle; });
     videos.forEach(v => v.clips.forEach(c => {
-      c.el.querySelectorAll('button[data-act="make"],button[data-act="look"],button[data-act="set-start"],button[data-act="set-end"],button[data-act="remove"]').forEach(b => { b.disabled = !idle; });
+      c.el.querySelectorAll('button[data-act="make"],button[data-act="look"],button[data-act="set-start"],button[data-act="set-end"],button[data-act="use-times"],button[data-act="dup"],button.tstep,button[data-act="remove"]').forEach(b => { b.disabled = !idle; });
       const sv = c.el.querySelector('button[data-act="save"]'); if (sv) sv.disabled = false;
     }));
   }
+
+
+  /* ---------- remembered settings (background, blur, ratio, quick-pick numbers) ---------- */
+  const SET_KEY = 'reelmaker.settings.v1';
+  function readSettings() { try { return JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {}; } catch (e) { return {}; } }
+  let setT = 0;
+  function saveSettings() {
+    clearTimeout(setT);
+    setT = setTimeout(() => {
+      try {
+        localStorage.setItem(SET_KEY, JSON.stringify({
+          bg: S.bg, bgMode: S.bgMode, bgBlur: $('#bgBlur').value, bgOpacity: $('#bgOpacity').value, ar: S.ar,
+          qN: $('#qN').value, qMin: $('#qMin').value, qMax: $('#qMax').value
+        }));
+      } catch (e) { /* storage blocked: fine */ }
+    }, 300);
+  }
+  ['input', 'change', 'click'].forEach(ev => document.addEventListener(ev, saveSettings, true));
+  (function restoreSettings() {
+    const o = readSettings();
+    try {
+      if (/^#[0-9a-f]{6}$/i.test(o.bg || '')) setBg(o.bg);
+      if (o.bgMode === 'blur' || o.bgMode === 'color') { $('#bgMode').value = o.bgMode; $('#bgMode').dispatchEvent(new Event('change')); }
+      if (o.bgBlur != null) { $('#bgBlur').value = o.bgBlur; $('#bgBlur').dispatchEvent(new Event('input')); }
+      if (o.bgOpacity != null) { $('#bgOpacity').value = o.bgOpacity; $('#bgOpacity').dispatchEvent(new Event('input')); }
+      if (o.ar && RATIOS.some(r => r[0] === o.ar)) setRatio(o.ar);
+      if (o.qN) $('#qN').value = o.qN;
+      if (o.qMin) $('#qMin').value = o.qMin;
+      if (o.qMax != null) $('#qMax').value = o.qMax;
+    } catch (e) { /* ignore bad saved data */ }
+  })();
 
   /* ---------- browser check ---------- */
   $('#diagRun').addEventListener('click', async () => {
