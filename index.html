@@ -7,7 +7,7 @@
 <style>[hidden]{display:none!important}body{margin:0}</style>
 </head>
 <body>
-<title>Reel Maker v4.10</title>
+<title>Reel Maker v4.11</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@700&family=Noto+Sans:wght@700&family=Bebas+Neue&family=Oswald:wght@400;700&family=Mukta:wght@700&family=Albert+Sans:wght@700&family=Archivo+Black&family=Archivo:wght@700&family=Epilogue:wght@700&family=Hind+Siliguri:wght@700&family=Luckiest+Guy&family=Montserrat:wght@900&family=Anton&display=swap">
@@ -204,7 +204,7 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
 
 <div class="app">
   <header>
-    <h1>Reel Maker <span class="meta">v4.10</span></h1>
+    <h1>Reel Maker <span class="meta">v4.11</span></h1>
     <p class="lede">Crops the bars off your videos, centers the scene on a black 9:16 canvas and puts your text on it. Your videos stay on this device.</p>
     <details class="canvasbox" id="diag" style="margin-top:8px"><summary>Check this browser</summary>
       <p class="hint">Not sure why something fails on one browser? This shows what this browser can do. Take a screenshot to compare browsers or send it to me.</p>
@@ -260,7 +260,7 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
       <button id="makeAll" class="btn primary small" type="button" disabled>Make all clips</button>
       <button id="stopBtn" class="btn small" type="button" hidden>Stop</button>
     </div>
-    <label class="chk" id="fastRow" style="margin-bottom:4px" hidden><input type="checkbox" id="fastEng"><span>Faster engine (experimental, off by default). Makes clips quicker than real time, but its files may not play on every device. Leave off unless you want to try it.</span></label>
+    <label class="chk" id="fastRow" style="margin-bottom:4px" hidden><input type="checkbox" id="fastEng"><span>Fast engine (on by default). Builds each frame exactly — avoids the start freeze of the normal recorder. Turn off only if a finished clip will not play on your phone.</span></label>
     <div id="banner" class="banner" hidden>Recording runs at normal speed. Keep this screen on and this tab open until it finishes.</div>
     <div class="clips-grid">
       <div class="pvcol">
@@ -336,8 +336,8 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
           </div>
           <p class="hint">Make all clips picks that many random clips from every ticked video, each with its own random length between Shortest and Longest, then records them one after another. Leave Longest empty to allow up to the whole video.</p>
           <label class="chk"><input type="checkbox" id="qSame"><span>Exact length: every clip is the Shortest number of seconds</span></label>
-          <div class="syncrow"><label for="aDelay">Audio sync (ms)</label><button type="button" class="tstep" id="aDelayMinus" aria-label="Less delay">&minus;10</button><input id="aDelay" type="text" inputmode="numeric" value="90" autocomplete="off" aria-label="Audio delay in milliseconds"><button type="button" class="tstep" id="aDelayPlus" aria-label="More delay">+10</button></div>
-          <p class="hint">Fixes sound and picture drifting apart in the made clips. If the sound comes BEFORE the picture, raise this number. If it comes AFTER, lower it. Default 90.</p>
+          <div class="syncrow"><label for="aDelay">Default audio sync (ms)</label><button type="button" class="tstep" id="aDelayMinus" aria-label="Less delay">&minus;10</button><input id="aDelay" type="text" inputmode="numeric" value="90" autocomplete="off" aria-label="Default audio delay in milliseconds for new clips" data-ios-default="280"><button type="button" class="tstep" id="aDelayPlus" aria-label="More delay">+10</button></div>
+          <p class="hint">Starting value for every new clip’s own Audio sync control (under each clip). Raise if sound comes before the picture. On iPhone ~280 ms is typical; on most computers ~90 ms. Each clip can be adjusted separately.</p>
           <label class="chk" id="smartRow" data-off="1"><input type="checkbox" id="qSmart" disabled><span>Favor the busy moments (turns on after Find busy moments)</span></label>
           <div class="actions">
             <button id="quickFill" class="btn small" type="button" disabled>Pick clips only, so I can add text first</button>
@@ -2684,16 +2684,20 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         '<div class="timefield"><label for="e' + id + '">End<input id="e' + id + '" type="text" inputmode="decimal" autocomplete="off"></label><span class="tkeys"><button type="button" class="tkey" data-tkey=":" aria-label="Insert colon">:</button><button type="button" class="tkey" data-tkey="." aria-label="Insert dot">.</button><button type="button" class="tstep" data-tstep="-1" aria-label="Back 1 second">−1s</button><button type="button" class="tstep" data-tstep="1" aria-label="Forward 1 second">+1s</button></span><button type="button" class="btn small" data-act="set-end">Set end here</button></div>' +
       '</div>' +
       '<div class="timeapply"><button type="button" class="btn primary small" data-act="use-times">Use now</button><span class="timemsg" role="status"></span></div>' +
+      '<div class="syncrow clip-sync"><label>Audio sync (ms)</label><button type="button" class="tstep" data-adelay="-10" aria-label="Less delay">&minus;10</button><input type="text" class="adelay-in" inputmode="numeric" value="" autocomplete="off" aria-label="Audio delay for this clip in milliseconds"><button type="button" class="tstep" data-adelay="10" aria-label="More delay">+10</button></div>' +
       '<div class="layers listcol"></div>' +
       '<div class="actions"><button type="button" class="btn small" data-act="add-layer">Add another text</button><button type="button" class="btn small" data-act="look">Show this clip</button><button type="button" class="btn primary small" data-act="make">Make clip</button></div>' +
       '<div class="clipprev" hidden><canvas width="360" height="640"></canvas><span class="hint">Tap the preview to pause or play.</span><div class="row"><button type="button" class="btn small" data-act="replay">Replay</button><button type="button" class="btn small" data-act="hideprev">Close</button></div></div>' +
       '<div class="res" hidden><div class="bar"><i></i></div><p class="note"></p><div class="actions resbtns" hidden><input type="text" class="fname" placeholder="File name (optional)" aria-label="File name" autocomplete="off"><button type="button" class="btn small" data-act="save">Save video</button>' + (CAN_SHARE_BTN ? '<button type="button" class="btn small" data-act="share">Share</button>' : '') + '<button type="button" class="btn small" data-act="watch">Watch</button></div><div class="resv"></div></div>';
     const c = {
       id, el, v, start, end, layers: [], stale: false, blob: null, ext: '', url: null,
+      aDelay: audioDelayMs(),
       inS: $('input[id^="s"]', el), inE: $('input[id^="e"]', el), layersEl: $('.layers', el),
-      dur: $('.dur', el), res: $('.res', el), bar: $('.bar > i', el), note: $('.note', el), resbtns: $('.resbtns', el), resv: $('.resv', el)
+      dur: $('.dur', el), res: $('.res', el), bar: $('.bar > i', el), note: $('.note', el), resbtns: $('.resbtns', el), resv: $('.resv', el),
+      inADelay: $('.adelay-in', el)
     };
     el._clip = c;
+    if (c.inADelay) c.inADelay.value = c.aDelay;
     const src = layers && layers.length ? layers : [newLayer('')];
     src.forEach(l => { const L = cloneLayer(l); c.layers.push(L); addLayerUI(c, L); });
     v.clips.push(c);
@@ -2762,6 +2766,13 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     }
   });
   list.addEventListener('input', e => {
+    if (e.target.classList.contains('adelay-in')) {
+      const c = e.target.closest('.clip')._clip;
+      const v = parseFloat(e.target.value);
+      c.aDelay = isFinite(v) ? clamp(Math.round(v), 0, 500) : audioDelayMs();
+      markStale(c);
+      return;
+    }
     const lay = e.target.closest('.layer'); if (!lay) return;
     const c = e.target.closest('.clip')._clip, L = lay._layer, k = e.target.dataset.k;
     if (e.target.tagName === 'TEXTAREA') L.text = e.target.value;
@@ -2775,6 +2786,13 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   list.addEventListener('change', async e => {
     const card = e.target.closest('.clip'); if (!card) return;
     const c = card._clip;
+    if (e.target.classList.contains('adelay-in')) {
+      const v = parseFloat(e.target.value);
+      c.aDelay = isFinite(v) ? clamp(Math.round(v), 0, 500) : audioDelayMs();
+      e.target.value = c.aDelay;
+      markStale(c);
+      return;
+    }
     if (e.target.dataset.k === 'font') { const L = e.target.closest('.layer')._layer; L.font = e.target.value; loadFontFor(L.font).then(() => { markStale(c); setActive(c); requestPreview(); }); markStale(c); return; }
     if (e.target.dataset.k === 'anchor') { const L = e.target.closest('.layer')._layer; L.anchor = e.target.value; markStale(c); setActive(c); requestPreview(); return; }
     const isS = e.target === c.inS, isE = e.target === c.inE;
@@ -2943,6 +2961,15 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     if (tk) { insertTkey(tk); return; }
     const sb = e.target.closest('button[data-step]');
     if (sb) { if (e.detail === 0) stepLayer(sb); return; }
+    const adel = e.target.closest('button[data-adelay]');
+    if (adel) {
+      const c = adel.closest('.clip')._clip;
+      const d = parseInt(adel.dataset.adelay, 10) || 0;
+      c.aDelay = clamp((c.aDelay || audioDelayMs()) + d, 0, 500);
+      if (c.inADelay) c.inADelay.value = c.aDelay;
+      markStale(c);
+      return;
+    }
     const btn = e.target.closest('button[data-act]'); if (!btn) return;
     const c = btn.closest('.clip')._clip, act = btn.dataset.act, lay = btn.closest('.layer');
     if (act === 'remove') return removeClip(c);
@@ -3311,7 +3338,34 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     renderVideoList();
     const ok = await loadSrc(v.url);
     if (!ok || !vid.videoWidth) { v.failed = true; return false; }
-    if (!v.vw) { v.vw = S.vw = vid.videoWidth; v.vh = S.vh = vid.videoHeight; v.dur = S.dur = vid.duration; }
+    if (!v.vw) {
+      v.vw = S.vw = vid.videoWidth; v.vh = S.vh = vid.videoHeight; v.dur = S.dur = vid.duration;
+      // Rough frame-rate probe: many phones report ~30; 24 fps films are common. We store it so the recorder can match.
+      v.fps = 30;
+      try {
+        if (typeof vid.requestVideoFrameCallback === 'function') {
+          let n = 0, t0 = 0;
+          const probe = now => {
+            if (n === 0) t0 = now;
+            n++;
+            if (n < 12) vid.requestVideoFrameCallback(probe);
+            else {
+              const elapsed = (now - t0) / 1000;
+              if (elapsed > 0.1) {
+                const measured = (n - 1) / elapsed;
+                // Snap to common rates
+                if (measured < 26) v.fps = 24;
+                else if (measured < 32) v.fps = 30;
+                else v.fps = Math.round(measured);
+              }
+              S.fps = v.fps;
+            }
+          };
+          vid.requestVideoFrameCallback(probe);
+        }
+      } catch (e) { /* ignore */ }
+      S.fps = v.fps || 30;
+    }
     $('#player').style.setProperty('--ar', (S.vw / S.vh).toFixed(4));
     $('#fileInfo').textContent = v.file.name + ' · ' + S.vw + '×' + S.vh + ' · ' + fmt(S.dur) + ' · ' + mb(v.file.size);
     syncPbDur(); pbSeek.value = 0; pbCur.textContent = fmt(0);
@@ -3605,6 +3659,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   function dupClip(c) {
     if (S.busy) return;
     const v = c.v, n = addClip(v, c.start, c.end, c.layers);
+    n.aDelay = c.aDelay;
+    if (n.inADelay) n.inADelay.value = n.aDelay;
     v.clips.splice(v.clips.indexOf(n), 1); v.clips.splice(v.clips.indexOf(c) + 1, 0, n);
     c.el.after(n.el); retitle(v); renderVideoList(); setActive(n);
     n.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -3653,8 +3709,13 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   $('#noteList').addEventListener('click', e => { const b = e.target.closest('button.tstep'); if (b && e.detail === 0) stepNoteTime(b.dataset.nk, +b.dataset.ni, +b.dataset.nstep); });
 
   /* ---------- recording ---------- */
-  const AUDIO_DELAY_DEFAULT = 90;
-  const audioDelayMs = () => { const v = parseFloat(($('#aDelay') || {}).value); return isFinite(v) ? clamp(v, 0, 400) : AUDIO_DELAY_DEFAULT; };
+  const AUDIO_DELAY_DEFAULT = IS_IOS ? 280 : 90;
+  const audioDelayMs = () => { const v = parseFloat(($('#aDelay') || {}).value); return isFinite(v) ? clamp(v, 0, 500) : AUDIO_DELAY_DEFAULT; };
+  // Per-clip delay takes priority; falls back to the global default.
+  function clipAudioDelayMs(c) {
+    if (c && isFinite(c.aDelay)) return clamp(c.aDelay, 0, 500);
+    return audioDelayMs();
+  }
   function ensureAudio() {
     if (audioCtx) return true;
     try {
@@ -3662,11 +3723,14 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       audioCtx = new AC();
       const src = audioCtx.createMediaElementSource(cvVid);
       monitor = audioCtx.createGain(); recDest = audioCtx.createMediaStreamDestination();
-      // The recorded picture arrives a little after the sound (canvas capture delay), so the recorded sound is held back by a few milliseconds. Only the recording path is delayed; what you hear while recording is unchanged.
-      aDelayNode = audioCtx.createDelay(0.5); aDelayNode.delayTime.value = audioDelayMs() / 1000;
+      // The recorded picture arrives a little after the sound (canvas capture delay), so the recorded sound is held back. Only the recording path is delayed; what you hear while recording is unchanged.
+      aDelayNode = audioCtx.createDelay(0.6); aDelayNode.delayTime.value = audioDelayMs() / 1000;
       src.connect(monitor); monitor.connect(audioCtx.destination); src.connect(aDelayNode); aDelayNode.connect(recDest);
       return true;
     } catch (e) { audioCtx = null; monitor = null; recDest = null; return false; }
+  }
+  function applyClipAudioDelay(c) {
+    if (aDelayNode) aDelayNode.delayTime.value = clipAudioDelayMs(c) / 1000;
   }
   function pickMime() {
     const c = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
@@ -3739,7 +3803,10 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         encVid.src = S.url;
         await new Promise((res, rej) => { encVid.onloadedmetadata = res; encVid.onerror = () => rej(new Error('video load failed')); });
       }
-      const FPS = 30, dur = end - start, total = Math.max(1, Math.round(dur * FPS));
+      // Match the source frame rate so each original frame is encoded exactly once (no repeats / drops).
+      const srcFps = (c.v && c.v.fps) || S.fps || 30;
+      const FPS = Math.min(30, Math.max(20, Math.round(srcFps)));
+      const dur = end - start, total = Math.max(1, Math.round(dur * FPS));
       noteOf(c, (batch ? batch + ' · ' : '') + 'Preparing audio…');
       const abuf = await decodedAudio();
       if (S.cancel) throw new Error('cancelled');
@@ -3747,6 +3814,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const useAAC = await aacSupported(sr, nch);
       if (!useAAC) throw new Error('noaac'); // Opus-in-MP4 will not play on iPhone or in Instagram; use the other recorder
       const aCodecLabel = useAAC ? 'AAC' : 'Opus';
+      // Shift audio later by the per-clip delay so sound and picture line up (same intent as the MediaRecorder path).
+      const delaySec = clipAudioDelayMs(c) / 1000;
       const s0 = Math.min(abuf.length, Math.floor(start * sr)), s1 = Math.min(abuf.length, Math.ceil(end * sr));
       muxer = new Mp4Muxer.Muxer({
         target: new Mp4Muxer.ArrayBufferTarget(),
@@ -3767,32 +3836,38 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       aEnc.configure(useAAC
         ? { codec: 'mp4a.40.2', sampleRate: sr, numberOfChannels: nch, bitrate: 128000 }
         : { codec: 'opus', sampleRate: sr, numberOfChannels: nch, bitrate: 128000 });
-      // Audio first: slice the clip range into small frames (all in memory, very fast).
+      // Audio first: slice the clip range into small frames. Timestamps are shifted by delaySec so the sound arrives after the picture by the measured amount.
       const PER = 1024, frames = Math.max(0, s1 - s0);
       for (let off = 0; off < frames; off += PER) {
         if (S.cancel) break;
         const n = Math.min(PER, frames - off);
         const data = new Float32Array(n * nch);
         for (let chI = 0; chI < nch; chI++) data.set(abuf.getChannelData(chI).subarray(s0 + off, s0 + off + n), chI * n);
-        const ad = new AudioData({ format: 'f32-planar', sampleRate: sr, numberOfFrames: n, numberOfChannels: nch, timestamp: Math.round(off / sr * 1e6), data });
+        const ad = new AudioData({ format: 'f32-planar', sampleRate: sr, numberOfFrames: n, numberOfChannels: nch, timestamp: Math.round((off / sr + delaySec) * 1e6), data });
         aEnc.encode(ad); ad.close();
       }
       await aEnc.flush();
       if (encErr) throw encErr;
       if (!aChunks) throw new Error('noaudio'); // encoder gave no audio: use the normal recorder instead
-      // Video: seek, composite, encode — as fast as the decoder can go, no realtime wait.
-      const ft = Math.round(1e6 / FPS), keyEvery = FPS * 2;
+      // Prime the decoder with a short run-up, then encode every source frame once.
+      // Each output frame is a fresh seek + draw, so there is no MediaRecorder-style held start.
+      await seekVidEl(encVid, Math.max(0, start - 0.25));
+      drawComposite(ecx, c.layers, false, encVid);
+      const ft = Math.round(1e6 / FPS), keyEvery = Math.max(1, Math.round(FPS * 2));
       for (let i = 0; i < total; i++) {
         if (S.cancel) break;
-        await seekVidEl(encVid, Math.min(end - 0.001, start + i / FPS));
+        const t = Math.min(end - 0.001, start + i / FPS);
+        await seekVidEl(encVid, t);
+        // One extra rAF so the decoded frame is painted before we snapshot it.
+        await new Promise(r => requestAnimationFrame(r));
         drawComposite(ecx, c.layers, false, encVid);
         const vf = new VideoFrame(encCanvas, { timestamp: i * ft, duration: ft });
-        vEnc.encode(vf, { keyFrame: i % keyEvery === 0 });
+        vEnc.encode(vf, { keyFrame: i === 0 || i % keyEvery === 0 });
         vf.close();
         if (encErr) throw encErr;
         if (i % 15 === 0 || i === total - 1) {
           c.bar.style.width = ((i + 1) / total * 100).toFixed(1) + '%';
-          c.note.textContent = (batch ? batch + ' · ' : '') + 'Encoding ' + (i + 1) + ' of ' + total + ' frames';
+          c.note.textContent = (batch ? batch + ' · ' : '') + 'Encoding ' + (i + 1) + ' of ' + total + ' frames @ ' + FPS + ' fps';
           await new Promise(r => setTimeout(r, 0));
         }
       }
@@ -3806,7 +3881,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         if (!(await blobPlays(blob))) throw new Error('unplayable');
         c.blob = blob; c.ext = 'mp4';
         c.bar.style.width = '100%';
-        noteOf(c, 'Done · ' + fmt(start) + ' to ' + fmt(end) + ' · ' + dur.toFixed(1) + ' s · ' + mb(blob.size) + ' · MP4 (fast engine, ' + aCodecLabel + ' audio)', 'ok');
+        noteOf(c, 'Done · ' + fmt(start) + ' to ' + fmt(end) + ' · ' + dur.toFixed(1) + ' s · ' + mb(blob.size) + ' · MP4 (fast, ' + aCodecLabel + ', ' + FPS + ' fps, sync ' + clipAudioDelayMs(c) + ' ms)', 'ok');
         c.resbtns.hidden = false;
       }
     } catch (e) {
@@ -3864,11 +3939,18 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     try { lock = navigator.wakeLock && await navigator.wakeLock.request('screen'); } catch (e) { /* optional */ }
     try {
       if (resumed) await resumed;
+      applyClipAudioDelay(c);
       cvVid.pause();
-      await seekTo(start);
       await Promise.all(c.layers.map(l => loadFontFor(l.font)));
+      const srcFps = (c.v && c.v.fps) || S.fps || 30;
+      const recFps = Math.min(30, Math.max(24, Math.round(srcFps)));
+
+      // Simple start: seek once to the real start, play, open the recorder.
+      // No mid-stream seeks, no chunk discarding — those caused multiple freezes.
+      await seekTo(start);
       drawComposite(pctx, c.layers, false);
-      const out = pv.captureStream(30);
+
+      const out = pv.captureStream(recFps);
       if (haveAudio && recDest) recDest.stream.getAudioTracks().forEach(t => out.addTrack(t));
       if (monitor) monitor.gain.value = 0;
       const mime = pickMime();
@@ -3878,14 +3960,23 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const chunks = [];
       rec.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
       const stopped = new Promise(r => { rec.onstop = r; });
+
       try { await cvVid.play(); } catch (e) { await new Promise(r => setTimeout(r, 400)); await cvVid.play(); }
-      rec.start(500);
+
+      // Let a few frames actually paint before the recorder opens.
+      for (let k = 0; k < 5; k++) {
+        drawComposite(pctx, c.layers, false);
+        await new Promise(r => requestAnimationFrame(r));
+      }
+
+      rec.start(250);
       noteOf(c, 'Recording…');
+
       const t0 = performance.now();
       await new Promise(resolve => {
         let frame = 0, timer = 0;
         const finish = () => { cancelAnimationFrame(frame); clearInterval(timer); resolve(); };
-        const done = () => S.cancel || cvVid.ended || cvVid.currentTime >= end - 0.02 || performance.now() - t0 > (end - start + 15) * 1000;
+        const done = () => S.cancel || cvVid.ended || cvVid.currentTime >= end - 0.02 || performance.now() - t0 > (end - start + 20) * 1000;
         const tick = () => {
           drawComposite(pctx, c.layers, false);
           const p = clamp((cvVid.currentTime - start) / (end - start), 0, 1);
@@ -3898,7 +3989,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       });
       cvVid.pause();
       drawComposite(pctx, c.layers, false);
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 180));
       try { rec.requestData(); } catch (e) { /* ignore */ }
       rec.stop();
       await stopped;
@@ -3910,11 +4001,12 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         if (!blob.size) throw new Error('empty');
         c.blob = blob; c.ext = /mp4/.test(type) ? 'mp4' : 'webm';
         c.bar.style.width = '100%';
-        noteOf(c, 'Done · ' + fmt(start) + ' to ' + fmt(end) + ' · ' + (end - start).toFixed(1) + ' s · ' + mb(blob.size) + ' · ' + c.ext.toUpperCase() + (c.ext === 'webm' ? ' (this browser records WebM; Safari on iPhone records MP4)' : ''), 'ok');
+        noteOf(c, 'Done · ' + fmt(start) + ' to ' + fmt(end) + ' · ' + (end - start).toFixed(1) + ' s · ' + mb(blob.size) + ' · ' + c.ext.toUpperCase() + ' · sync ' + clipAudioDelayMs(c) + ' ms' + (c.ext === 'webm' ? ' (this browser records WebM; Safari on iPhone records MP4)' : ''), 'ok');
         c.resbtns.hidden = false;
       }
     } catch (e) {
-      noteOf(c, 'Recording failed. ' + (e && e.name === 'NotAllowedError' ? 'The browser blocked playback; tap Make clip again.' : 'Try again, or choose a shorter clip.'), 'bad');
+      if (S.cancel && /cancelled/.test(e && e.message || '')) noteOf(c, 'Stopped. Nothing was kept for this clip.');
+      else noteOf(c, 'Recording failed. ' + (e && e.name === 'NotAllowedError' ? 'The browser blocked playback; tap Make clip again.' : 'Try again, or choose a shorter clip.'), 'bad');
     } finally {
       if (monitor) monitor.gain.value = 1;
       cvVid.pause();
@@ -4034,8 +4126,16 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
 
 
   function setAudioDelay(v) {
-    const n = clamp(Math.round(parseFloat(v)), 0, 400); const val = isFinite(n) ? n : AUDIO_DELAY_DEFAULT;
+    const n = clamp(Math.round(parseFloat(v)), 0, 500); const val = isFinite(n) ? n : AUDIO_DELAY_DEFAULT;
     $('#aDelay').value = val; if (aDelayNode) aDelayNode.delayTime.value = val / 1000;
+  }
+  // Apply platform default once if nothing was saved.
+  if (!localStorage.getItem('reelmaker.settings.v1')) setAudioDelay(AUDIO_DELAY_DEFAULT);
+  else {
+    try {
+      const o = JSON.parse(localStorage.getItem('reelmaker.settings.v1') || '{}');
+      if (o.aDelay == null) setAudioDelay(AUDIO_DELAY_DEFAULT);
+    } catch (e) { setAudioDelay(AUDIO_DELAY_DEFAULT); }
   }
   $('#aDelay').addEventListener('change', e => setAudioDelay(e.target.value));
   $('#aDelayMinus').addEventListener('click', () => setAudioDelay(audioDelayMs() - 10));
@@ -4107,9 +4207,12 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   document.fonts && document.fonts.load('700 66px Inter').then(requestPreview, () => {});
   drawComposite(pctx, null, true);
   $('#fastRow').hidden = !WC_FAST;
-  $('#banner').textContent = WC_FAST
-    ? 'Clips are recorded at normal speed by default: a 20-second clip takes about 20 seconds. Keep this screen on and this tab open until it finishes.'
-    : 'This browser has no WebCodecs encoders, so clips record at normal speed (like v2). Keep this screen on and this tab open until it finishes.';
+  if (WC_FAST) {
+    $('#fastEng').checked = true;
+    $('#banner').textContent = 'Fast engine is on (recommended). Clips build frame-by-frame — no MediaRecorder freeze at the start. Keep this screen on until it finishes.';
+  } else {
+    $('#banner').textContent = 'This browser has no WebCodecs encoders, so clips record at normal speed. Keep this screen on and this tab open until it finishes.';
+  }
   updateButtons();
 })();
 </script>
