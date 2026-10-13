@@ -2,7 +2,7 @@
 
 Turn any video into 9:16 reels in your browser. Reel Maker crops off the bars and burned-in captions, centres the scene on a canvas you choose, adds your own on-screen text, cuts random clips, and gives you MP4 files. Everything runs on your device. Your videos are never uploaded.
 
-Version 4.7 · one file: `index.html` · no install, no account, free.
+Version 4.10 · one file: `index.html` · no install, no account, free.
 
 ---
 
@@ -28,6 +28,11 @@ Version 4.7 · one file: `index.html` · no install, no account, free.
 - **Text lines:** paste one line per clip and apply them all at once, shuffled if you like.
 - **Canvas:** 9:16, 1:1, 4:5 or 16:9. Any background colour (picker, swatches, full palette), or a blurred copy of the video. Move and resize the video on the canvas.
 - **Start and End nudge buttons (v4.7):** next to every Start and End box (and on noted moments) are -1s and +1s buttons. Hold one to keep stepping. Start can't pass End, and a clip stays at least 1 second long.
+- **Use now (v4.9):** one Use now button per clip. Change Start and/or End (type, or use -1s/+1s), press Use now, and that clip takes those times. Then press Make clip to build the video again. "Set start here" and "Set end here" copy the time of the player you used last.
+- **Video names (v4.10):** each video in the list has a name box. Saved clips are named "Your name - clip 1.mp4", "- clip 2" and so on. Leave it empty to use the file name. A clip's own File name box still wins for that clip.
+- **Sound sync and smoother blur (v4.10):** the sound used to land about 0.09 s before the picture in made clips. It is now held back to match. If it is still off on your device, change "Audio sync (ms)": raise it if the sound comes first, lower it if the sound comes late. The blurred background is also much lighter to record, so clips with blur are smoother.
+- **More in v4.9:** Duplicate clip, a File name box on each finished clip, and remembered settings (background, blur, aspect ratio, clip counts and lengths).
+- **Older note (v4.8):** Use now, Note this moment and add clip here take the time from the player you used last: the source video, the preview bar under the canvas, or a clip's Show this clip player.
 - **Preview player:** play, mute, seek, and 0.5x to 2x speed. The play button previews the selected clip and stops at its end. The source video above always plays freely, past any clip. The two are fully separate (v4.6): playing one pauses the other, and changing a clip's start or end jumps the preview to the new start without touching the source video. Text edits redraw the preview, also after a clip has finished.
 
 ---

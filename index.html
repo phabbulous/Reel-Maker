@@ -121,6 +121,10 @@ input[type="number"] { text-align: center; font-family: var(--font-mono); }
 .tstep { min-width: 40px; height: 34px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: 700 13px var(--font-ui); cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 .tstep:active { background: var(--accent); color: #fff; }
 .timefield { flex-wrap: wrap; }
+.syncrow { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; margin: 8px 0 2px; }
+.syncrow label { font-size: 13px; flex: 1 1 auto; }
+.syncrow .tstep { min-width: 40px; flex: none; }
+.syncrow input { width: 56px; text-align: center; font-family: var(--font-mono); }
 .timeapply { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 .timemsg { font-size: 12px; color: var(--muted); }
 .resbtns .fname { flex: 1 1 150px; }
@@ -148,11 +152,11 @@ textarea { resize: vertical; min-height: 64px; line-height: 1.35; }
 @media (prefers-reduced-motion: no-preference) { .bar > i { transition: width 0.2s linear; } }
 
 .vlist { display: grid; gap: 6px; }
-.vitem { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px; background: var(--field); }
+.vitem { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px; background: var(--field); }
 .vitem.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .vitem input { width: 20px; height: 20px; }
 .vitem .vname { text-align: left; justify-content: flex-start; overflow-wrap: anywhere; font-weight: 500; }
-.vitem input.vname-in { width: 100%; height: 34px; font: 500 13px var(--font-ui); }
+.vitem input.vname-in { width: 100%; height: 34px; font: 500 14px var(--font-ui); grid-column: 2 / -1; }
 .layer { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--field); }
 .layer details summary { cursor: pointer; font-size: 13px; color: var(--accent); min-height: 32px; display: flex; align-items: center; }
 .lgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin: 6px 0; }
@@ -332,6 +336,8 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
           </div>
           <p class="hint">Make all clips picks that many random clips from every ticked video, each with its own random length between Shortest and Longest, then records them one after another. Leave Longest empty to allow up to the whole video.</p>
           <label class="chk"><input type="checkbox" id="qSame"><span>Exact length: every clip is the Shortest number of seconds</span></label>
+          <div class="syncrow"><label for="aDelay">Audio sync (ms)</label><button type="button" class="tstep" id="aDelayMinus" aria-label="Less delay">&minus;10</button><input id="aDelay" type="text" inputmode="numeric" value="90" autocomplete="off" aria-label="Audio delay in milliseconds"><button type="button" class="tstep" id="aDelayPlus" aria-label="More delay">+10</button></div>
+          <p class="hint">Fixes sound and picture drifting apart in the made clips. If the sound comes BEFORE the picture, raise this number. If it comes AFTER, lower it. Default 90.</p>
           <label class="chk" id="smartRow" data-off="1"><input type="checkbox" id="qSmart" disabled><span>Favor the busy moments (turns on after Find busy moments)</span></label>
           <div class="actions">
             <button id="quickFill" class="btn small" type="button" disabled>Pick clips only, so I can add text first</button>
@@ -2281,7 +2287,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const CAN_SHARE_BTN = !IS_IOS && typeof navigator.share === 'function';
   const IN_FRAME = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
-  let downloads = null, batch = '', audioCtx = null, monitor = null, recDest = null, seq = 0, raf = 0;
+  let aDelayNode = null, downloads = null, batch = '', audioCtx = null, monitor = null, recDest = null, seq = 0, raf = 0;
 
   try {
     if (window.claude && typeof window.claude.use === 'function') {
@@ -2519,6 +2525,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   }
 
   let bgMid = null;
+  let bgFull = null, bgKey = '';
   let bgCv = null; // scratch canvas for the blurred-video background
   function drawComposite(ctx, layers, guides, vel) {
     vel = vel || cvVid;
@@ -2533,17 +2540,25 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const div = 1 + amt * 0.9;
       const tw = Math.max(4, Math.round(W / div)), th = Math.max(4, Math.round(H / div));
       if (!bgCv || bgCv.width !== tw || bgCv.height !== th) { bgCv = document.createElement('canvas'); bgCv.width = tw; bgCv.height = th; bgMid = document.createElement('canvas'); bgMid.width = tw * 3; bgMid.height = th * 3; }
-      const bx = bgCv.getContext('2d');
-      const bk = Math.max(tw / bc.w, th / bc.h), bw = bc.w * bk, bh = bc.h * bk;
-      bx.clearRect(0, 0, tw, th);
-      bx.imageSmoothingEnabled = true; bx.imageSmoothingQuality = 'high';
-      bx.drawImage(vel, bc.x, bc.y, bc.w, bc.h, (tw - bw) / 2, (th - bh) / 2, bw, bh);
-      const mx = bgMid.getContext('2d'); mx.imageSmoothingEnabled = true; mx.imageSmoothingQuality = 'high';
-      mx.drawImage(bgCv, 0, 0, tw * 3, th * 3);
+      // The blurred picture changes slowly, so it is rebuilt about 15 times a second and reused in between. This keeps recording smooth.
+      const key = [Math.floor((vel.currentTime || 0) * 15), bc.x, bc.y, bc.w, bc.h, tw, th, W, H, vel.currentSrc].join('|');
+      if (!bgFull || bgFull.width !== W || bgFull.height !== H) { bgFull = document.createElement('canvas'); bgFull.width = W; bgFull.height = H; bgKey = ''; }
+      if (key !== bgKey) {
+        bgKey = key;
+        const bx = bgCv.getContext('2d');
+        const bk = Math.max(tw / bc.w, th / bc.h), bw = bc.w * bk, bh = bc.h * bk;
+        bx.clearRect(0, 0, tw, th);
+        bx.imageSmoothingEnabled = true; bx.imageSmoothingQuality = 'high';
+        bx.drawImage(vel, bc.x, bc.y, bc.w, bc.h, (tw - bw) / 2, (th - bh) / 2, bw, bh);
+        const mx = bgMid.getContext('2d'); mx.imageSmoothingEnabled = true; mx.imageSmoothingQuality = 'low';
+        mx.drawImage(bgCv, 0, 0, tw * 3, th * 3);
+        const fx = bgFull.getContext('2d'); fx.imageSmoothingEnabled = true; fx.imageSmoothingQuality = 'low';
+        fx.clearRect(0, 0, W, H);
+        fx.drawImage(bgMid, 0, 0, W, H);
+      }
       ctx.save();
       ctx.globalAlpha = S.bgOpacity == null ? 1 : S.bgOpacity;
-      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(bgMid, 0, 0, W, H);
+      ctx.drawImage(bgFull, 0, 0);
       ctx.restore();
     }
     layers = layers && layers.length ? layers : [newLayer('Your text goes here')];
@@ -3325,13 +3340,15 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       nm.addEventListener('click', async () => { if (!S.busy && v !== cur) await useVideo(v); });
       const cn = document.createElement('input'); cn.type = 'text'; cn.className = 'vname-in';
       cn.placeholder = v.name; cn.value = v.customName || ''; cn.setAttribute('aria-label', 'Name for ' + v.name); cn.autocomplete = 'off';
+      cn.addEventListener('input', () => { v.customName = cn.value.trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').slice(0, 80); });
+      // No list rebuild here: rebuilding would steal the cursor from the next name box you tap into.
       cn.addEventListener('change', () => {
         v.customName = cn.value.trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').slice(0, 80);
-        renderVideoList(); updateButtons();
+        nm.textContent = (v.customName || v.name) + (v.dur ? ' · ' + fmt(v.dur) : '') + ' · ' + v.clips.length + (v.clips.length === 1 ? ' clip' : ' clips');
       });
       const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'btn quiet small'; rm.textContent = 'Remove';
       rm.addEventListener('click', () => removeVideo(v));
-      row.append(cb, nm, cn, rm); box.appendChild(row);
+      row.append(cb, nm, rm, cn); box.appendChild(row);
     });
   }
   async function removeVideo(v) {
@@ -3636,6 +3653,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   $('#noteList').addEventListener('click', e => { const b = e.target.closest('button.tstep'); if (b && e.detail === 0) stepNoteTime(b.dataset.nk, +b.dataset.ni, +b.dataset.nstep); });
 
   /* ---------- recording ---------- */
+  const AUDIO_DELAY_DEFAULT = 90;
+  const audioDelayMs = () => { const v = parseFloat(($('#aDelay') || {}).value); return isFinite(v) ? clamp(v, 0, 400) : AUDIO_DELAY_DEFAULT; };
   function ensureAudio() {
     if (audioCtx) return true;
     try {
@@ -3643,7 +3662,9 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       audioCtx = new AC();
       const src = audioCtx.createMediaElementSource(cvVid);
       monitor = audioCtx.createGain(); recDest = audioCtx.createMediaStreamDestination();
-      src.connect(monitor); monitor.connect(audioCtx.destination); src.connect(recDest);
+      // The recorded picture arrives a little after the sound (canvas capture delay), so the recorded sound is held back by a few milliseconds. Only the recording path is delayed; what you hear while recording is unchanged.
+      aDelayNode = audioCtx.createDelay(0.5); aDelayNode.delayTime.value = audioDelayMs() / 1000;
+      src.connect(monitor); monitor.connect(audioCtx.destination); src.connect(aDelayNode); aDelayNode.connect(recDest);
       return true;
     } catch (e) { audioCtx = null; monitor = null; recDest = null; return false; }
   }
@@ -3857,12 +3878,9 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const chunks = [];
       rec.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
       const stopped = new Promise(r => { rec.onstop = r; });
-      // Start the recorder before playback begins: any decoder preroll then
-      // holds the start frame and silence on both tracks identically, instead
-      // of the audio clock running ahead of a video that isn't presenting yet.
+      try { await cvVid.play(); } catch (e) { await new Promise(r => setTimeout(r, 400)); await cvVid.play(); }
       rec.start(500);
       noteOf(c, 'Recording…');
-      try { await cvVid.play(); } catch (e) { await new Promise(r => setTimeout(r, 400)); await cvVid.play(); }
       const t0 = performance.now();
       await new Promise(resolve => {
         let frame = 0, timer = 0;
@@ -4015,6 +4033,13 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   }
 
 
+  function setAudioDelay(v) {
+    const n = clamp(Math.round(parseFloat(v)), 0, 400); const val = isFinite(n) ? n : AUDIO_DELAY_DEFAULT;
+    $('#aDelay').value = val; if (aDelayNode) aDelayNode.delayTime.value = val / 1000;
+  }
+  $('#aDelay').addEventListener('change', e => setAudioDelay(e.target.value));
+  $('#aDelayMinus').addEventListener('click', () => setAudioDelay(audioDelayMs() - 10));
+  $('#aDelayPlus').addEventListener('click', () => setAudioDelay(audioDelayMs() + 10));
   /* ---------- remembered settings (background, blur, ratio, quick-pick numbers) ---------- */
   const SET_KEY = 'reelmaker.settings.v1';
   function readSettings() { try { return JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {}; } catch (e) { return {}; } }
@@ -4025,7 +4050,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       try {
         localStorage.setItem(SET_KEY, JSON.stringify({
           bg: S.bg, bgMode: S.bgMode, bgBlur: $('#bgBlur').value, bgOpacity: $('#bgOpacity').value, ar: S.ar,
-          qN: $('#qN').value, qMin: $('#qMin').value, qMax: $('#qMax').value
+          qN: $('#qN').value, qMin: $('#qMin').value, qMax: $('#qMax').value, aDelay: $('#aDelay').value
         }));
       } catch (e) { /* storage blocked: fine */ }
     }, 300);
@@ -4039,6 +4064,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       if (o.bgBlur != null) { $('#bgBlur').value = o.bgBlur; $('#bgBlur').dispatchEvent(new Event('input')); }
       if (o.bgOpacity != null) { $('#bgOpacity').value = o.bgOpacity; $('#bgOpacity').dispatchEvent(new Event('input')); }
       if (o.ar && RATIOS.some(r => r[0] === o.ar)) setRatio(o.ar);
+      if (o.aDelay != null) setAudioDelay(o.aDelay);
       if (o.qN) $('#qN').value = o.qN;
       if (o.qMin) $('#qMin').value = o.qMin;
       if (o.qMax != null) $('#qMax').value = o.qMax;
