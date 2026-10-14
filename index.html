@@ -3850,26 +3850,21 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       // The fast engine stamps picture and sound exactly, so the sound-sync delay (a fix for the normal recorder) is not used here.
       const delaySec = 0; // the fast engine writes exact timestamps, so no sound delay is needed here
       const s0 = Math.min(abuf.length, Math.floor(start * sr)), s1 = Math.min(abuf.length, Math.ceil(end * sr));
-      muxer = new Mp4Muxer.Muxer({
+      const newMuxer = () => new Mp4Muxer.Muxer({
         target: new Mp4Muxer.ArrayBufferTarget(),
         video: { codec: 'avc', width: W, height: H },
         audio: { codec: useAAC ? 'aac' : 'opus', sampleRate: sr, numberOfChannels: nch },
         fastStart: 'in-memory', firstTimestampBehavior: 'offset'
       });
-      let encErr = null, aChunks = 0;
-      vEnc = new VideoEncoder({
-        output: (ch, meta) => { try { muxer.addVideoChunk(ch, meta); } catch (e) { encErr = encErr || e; } },
-        error: e => { encErr = encErr || e; }
-      });
-      vEnc.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: 14000000, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } });
+      let encErr = null; const aList = [];
       aEnc = new AudioEncoder({
-        output: (ch, meta) => { aChunks++; try { muxer.addAudioChunk(ch, meta); } catch (e) { encErr = encErr || e; } },
+        output: (ch, meta) => { aList.push([ch, meta]); },
         error: e => { encErr = encErr || e; }
       });
       aEnc.configure(useAAC
         ? { codec: 'mp4a.40.2', sampleRate: sr, numberOfChannels: nch, bitrate: 128000 }
         : { codec: 'opus', sampleRate: sr, numberOfChannels: nch, bitrate: 128000 });
-      // Audio first: slice the clip range into small frames. Timestamps are shifted by delaySec so the sound arrives after the picture by the measured amount.
+      // Audio first: slice the clip range into small frames. The fast engine stamps picture and sound exactly.
       const PER = 1024, frames = Math.max(0, s1 - s0);
       for (let off = 0; off < frames; off += PER) {
         if (S.cancel) break;
@@ -3881,12 +3876,103 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       }
       await aEnc.flush();
       if (encErr) throw encErr;
-      if (!aChunks) throw new Error('noaudio'); // encoder gave no audio: use the normal recorder instead
-      // Prime the decoder with a short run-up, then encode every source frame once.
-      // Each output frame is a fresh seek + draw, so there is no MediaRecorder-style held start.
+      if (!S.cancel && !aList.length) throw new Error('noaudio'); // encoder gave no audio: use the normal recorder instead
+      const makeVEnc = (onChunk, onErr) => {
+        const e = new VideoEncoder({ output: onChunk, error: onErr });
+        e.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: 14000000, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } });
+        return e;
+      };
+      const ft = Math.round(1e6 / FPS), keyEvery = Math.max(1, Math.round(FPS * 2));
+      const srcDt = 1 / Math.max(10, srcFps), minStep = (1 / FPS) * 0.85;
+      let skippedNote = '';
+      // Fast path: play the source forward and take each picture exactly once as the browser presents it.
+      // (Jumping to every frame separately made the browser re-decode from the nearest key frame each time, which was slower than real time.)
+      const forwardPass = async (rate, lastChance) => {
+        muxer = newMuxer(); aList.forEach(([ch, meta]) => muxer.addAudioChunk(ch, meta));
+        try { vEnc && vEnc.close(); } catch (e) { /* ignore */ }
+        let err2 = null;
+        vEnc = makeVEnc((ch, meta) => { try { muxer.addVideoChunk(ch, meta); } catch (e) { err2 = err2 || e; } }, e => { err2 = err2 || e; });
+        encVid.pause(); encVid.playbackRate = rate;
+        let lastM = -1, lastAcc = -1, lastTs = -1, lastKey = -1, count = 0, dropped = 0, lastCb = performance.now(), heldByUs = false;
+        const tPass = performance.now();
+        // The very first picture is taken while the source is paused on the clip start. This also warms up drawing and the encoder, so nothing is missed once it starts playing.
+        const target0 = Math.max(0, start + srcDt * 0.25); // a hair after the start, so the picture that covers the start time is the one shown
+        const m0 = await new Promise(res => {
+          const to = setTimeout(() => res(start), 2500);
+          const first = (n, m) => {
+            if (encVid.seeking) { try { encVid.requestVideoFrameCallback(first); } catch (e) { clearTimeout(to); res(start); } return; } // a picture from before the jump
+            clearTimeout(to); res(m.mediaTime);
+          };
+          try { encVid.requestVideoFrameCallback(first); } catch (e) { clearTimeout(to); res(start); }
+          encVid.currentTime = target0;
+        });
+        if (S.cancel) return { r: 'cancel' };
+        drawComposite(ecx, c.layers, false, encVid);
+        { const vf = new VideoFrame(encCanvas, { timestamp: 0, duration: ft }); vEnc.encode(vf, { keyFrame: true }); vf.close(); }
+        lastM = m0; lastAcc = m0; lastTs = 0; lastKey = m0; count = 1;
+        if (err2) throw err2;
+        const result = await new Promise(resolve => {
+          let settled = false, wd = 0;
+          const done = r => { if (settled) return; settled = true; clearInterval(wd); encVid.removeEventListener('ended', onEnd); try { encVid.pause(); } catch (e) { /* ignore */ } resolve(r); };
+          const onEnd = () => done('ok');
+          encVid.addEventListener('ended', onEnd);
+          wd = setInterval(() => { if (S.cancel) done('cancel'); else if (!encVid.paused && performance.now() - lastCb > 5000) done('stalled'); }, 200);
+          const resume = () => { if (heldByUs && !settled && vEnc.encodeQueueSize <= 2) { heldByUs = false; encVid.play().catch(() => {}); } };
+          vEnc.addEventListener('dequeue', resume);
+          const cb = (now, m) => {
+            if (settled) return;
+            try { encVid.requestVideoFrameCallback(cb); } catch (e) { done('error'); return; } // always listen for the next picture first, so none is missed
+            lastCb = performance.now();
+            const mt = m.mediaTime;
+            if (mt >= end - 0.0005) { done('ok'); return; }
+            if (mt > lastM + srcDt * 0.1) {
+              if (lastM >= 0 && mt - lastM > srcDt * 1.6) { dropped += Math.round((mt - lastM) / srcDt) - 1; if (!lastChance) { done('dropped'); return; } }
+              lastM = mt;
+              if (lastAcc < 0 || mt - lastAcc >= minStep) {
+                lastAcc = mt;
+                drawComposite(ecx, c.layers, false, encVid);
+                let ts = Math.max(0, Math.round((mt - start) * 1e6)); if (ts <= lastTs) ts = lastTs + 1; lastTs = ts;
+                const vf = new VideoFrame(encCanvas, { timestamp: ts, duration: ft });
+                vEnc.encode(vf, { keyFrame: count === 0 || mt - lastKey >= 2 }); if (count === 0 || mt - lastKey >= 2) lastKey = mt;
+                vf.close(); count++;
+                if (err2) { done('error'); return; }
+                if (count % 12 === 0) {
+                  c.bar.style.width = (clamp((mt - start) / (end - start), 0, 1) * 100).toFixed(1) + '%';
+                  c.note.textContent = (batch ? batch + ' · ' : '') + 'Encoding ' + Math.max(0, mt - start).toFixed(1) + ' of ' + (end - start).toFixed(1) + ' s';
+                }
+                if (vEnc.encodeQueueSize > 8 && !heldByUs) { heldByUs = true; encVid.pause(); } // let the encoder catch up without the source running ahead
+              }
+            }
+          };
+          try { encVid.requestVideoFrameCallback(cb); encVid.play().catch(() => done('error')); } catch (e) { done('error'); }
+        });
+        try { (window.__rmFast = window.__rmFast || []).push({ rate, result, ms: Math.round(performance.now() - tPass), count, dropped }); } catch (e) { /* ignore */ }
+        if (result === 'error' && err2) throw err2;
+        if (result === 'stalled') throw new Error('the source video stopped delivering pictures');
+        if (result === 'cancel') return { r: 'cancel' };
+        if (result === 'dropped') return { r: 'dropped' };
+        if (!count) throw new Error('no pictures were produced');
+        await vEnc.flush();
+        if (err2) throw err2;
+        return { r: 'ok', dropped };
+      };
+      if (typeof encVid.requestVideoFrameCallback === 'function') {
+        let res = { r: 'dropped' };
+        // Faster than normal speed only if this computer keeps up without the browser skipping any picture; otherwise step down. The last rate that worked is remembered.
+        const rates = [2, 1].filter(x => x <= fastRate);
+        for (const rate of rates) {
+          if (S.cancel) break;
+          res = await forwardPass(rate, rate === rates[rates.length - 1]);
+          if (res.r === 'ok') { fastRate = rate; break; }
+          if (res.r !== 'dropped') break;
+        }
+        if (res.r === 'ok' && res.dropped) skippedNote = ' · the browser skipped ' + res.dropped + ' picture' + (res.dropped === 1 ? '' : 's');
+      } else {
+        // Older browsers without frame callbacks: one seek per picture.
+        muxer = newMuxer(); aList.forEach(([ch, meta]) => muxer.addAudioChunk(ch, meta));
+        vEnc = makeVEnc((ch, meta) => { try { muxer.addVideoChunk(ch, meta); } catch (e) { encErr = encErr || e; } }, e => { encErr = encErr || e; });
       await seekVidEl(encVid, Math.max(0, start - 0.25));
       drawComposite(ecx, c.layers, false, encVid);
-      const ft = Math.round(1e6 / FPS), keyEvery = Math.max(1, Math.round(FPS * 2));
       for (let i = 0; i < total; i++) {
         if (S.cancel) break;
         const t = Math.min(end - 0.001, start + i / FPS);
@@ -3904,7 +3990,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
           await new Promise(r => setTimeout(r, 0));
         }
       }
-      await vEnc.flush();
+        await vEnc.flush();
+      }
       if (encErr) throw encErr;
       muxer.finalize();
       if (S.cancel) { noteOf(c, 'Stopped. Nothing was kept for this clip.'); c.bar.style.width = '0%'; }
@@ -3916,7 +4003,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         { const ok = await fastAudioOK(blob, abuf, s0, s1); if (ok === false) throw new Error('nosound'); }
         c.blob = blob; c.ext = 'mp4';
         c.bar.style.width = '100%';
-        noteOf(c, 'Done · ' + fmt(start) + ' to ' + fmt(end) + ' · ' + dur.toFixed(1) + ' s · ' + mb(blob.size) + ' · MP4 (fast, ' + aCodecLabel + ', ' + FPS + ' fps, exact sync)', 'ok');
+        noteOf(c, 'Done · ' + fmt(start) + ' to ' + fmt(end) + ' · ' + dur.toFixed(1) + ' s · ' + mb(blob.size) + ' · MP4 (fast, ' + aCodecLabel + ', ' + FPS + ' fps, exact sync)' + skippedNote, 'ok');
         c.resbtns.hidden = false;
       }
     } catch (e) {
@@ -3957,7 +4044,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       v.src = u;
     });
   }
-  let WC_OK = true, lastFastErr = '';
+  let WC_OK = true, lastFastErr = '', fastRate = 2;
   // While one clip is being made on its own, its Make clip button is replaced by Cancel.
   async function makeClip(c, inBatch) {
     if (S.busy) return;
