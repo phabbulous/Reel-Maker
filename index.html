@@ -263,6 +263,14 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
       <button id="makeAll" class="btn primary small" type="button" disabled>Make all clips</button>
       <button id="stopBtn" class="btn small" type="button" hidden>Stop</button>
     </div>
+    <div class="syncrow" id="sizeRow" style="margin-bottom:4px"><label for="fileSize">File size</label>
+      <select id="fileSize" aria-label="Output file size">
+        <option value="tiny">Tiny (about 20 MB per minute)</option>
+        <option value="small">Small (about 30 MB per minute)</option>
+        <option value="bal">Balanced (about 45 MB per minute)</option>
+        <option value="high" selected>Large, best quality (60 MB per minute, 105 with the fast engine)</option>
+      </select></div>
+    <p class="hint" id="sizeHint" style="margin:0 0 6px">Large is the best quality. Instagram shrinks every upload to around 4 Mbps anyway, so a smaller size looks the same once it is posted. Applies to clips you make from now on.</p>
     <label class="chk" id="fastRow" style="margin-bottom:4px" hidden><input type="checkbox" id="fastEng"><span>Fast engine (off by default). Builds each frame exactly instead of recording in real time. If it fails here, or its clip has no sound, it switches back to the normal recorder by itself.</span></label>
     <div id="banner" class="banner" hidden>Recording runs at normal speed. Keep this screen on and this tab open until it finishes.</div>
     <div class="clips-grid">
@@ -3830,6 +3838,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     try { lock = navigator.wakeLock && await navigator.wakeLock.request('screen'); } catch (e) { /* optional */ }
     const ecx = encSetup();
     let vEnc = null, aEnc = null, muxer = null;
+    fastHidden = !!document.hidden; fastRunning = true;
     try {
       await Promise.all(c.layers.map(l => loadFontFor(l.font)));
       if (encVid.src !== S.url) {
@@ -3862,8 +3871,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         error: e => { encErr = encErr || e; }
       });
       aEnc.configure(useAAC
-        ? { codec: 'mp4a.40.2', sampleRate: sr, numberOfChannels: nch, bitrate: 128000 }
-        : { codec: 'opus', sampleRate: sr, numberOfChannels: nch, bitrate: 128000 });
+        ? { codec: 'mp4a.40.2', sampleRate: sr, numberOfChannels: nch, bitrate: sizeBits(true).a }
+        : { codec: 'opus', sampleRate: sr, numberOfChannels: nch, bitrate: sizeBits(true).a });
       // Audio first: slice the clip range into small frames. The fast engine stamps picture and sound exactly.
       const PER = 1024, frames = Math.max(0, s1 - s0);
       for (let off = 0; off < frames; off += PER) {
@@ -3879,7 +3888,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       if (!S.cancel && !aList.length) throw new Error('noaudio'); // encoder gave no audio: use the normal recorder instead
       const makeVEnc = (onChunk, onErr) => {
         const e = new VideoEncoder({ output: onChunk, error: onErr });
-        e.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: 14000000, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } });
+        e.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: sizeBits(true).v, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } });
         return e;
       };
       const ft = Math.round(1e6 / FPS), keyEvery = Math.max(1, Math.round(FPS * 2));
@@ -4008,11 +4017,18 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       }
     } catch (e) {
       if (S.cancel) { noteOf(c, 'Stopped. Nothing was kept for this clip.'); c.bar.style.width = '0%'; }
-      else { engineFailed = true; WC_OK = false; lastFastErr = String(e && e.message || e); if (/nosound|noaudio|noaac/.test(lastFastErr)) { try { localStorage.setItem('reelmaker.fastbad.v1', lastFastErr); } catch (x) { /* ignore */ } } try { console.warn('fast engine failed:', e); } catch (x) { /* ignore */ } c.blob = null; c.resbtns.hidden = true; noteOf(c, 'The fast engine did not work here (' + lastFastErr.slice(0, 80) + '), switching to the normal recorder…'); }
+      else {
+        engineFailed = true; WC_OK = false; lastFastErr = String(e && e.message || e);
+        const why = fastWhyText(lastFastErr, fastHidden);
+        c.fastWhy = why; showFastWhy(why);
+        try { console.warn('fast engine failed:', e); } catch (x) { /* ignore */ }
+        c.blob = null; c.resbtns.hidden = true; noteOf(c, 'The fast engine failed: ' + why + ' Switching to the normal recorder…');
+      }
     } finally {
       try { vEnc && vEnc.close(); } catch (e) { /* ignore */ }
       try { aEnc && aEnc.close(); } catch (e) { /* ignore */ }
       try { lock && lock.release(); } catch (e) { /* ignore */ }
+      fastRunning = false;
       S.busy = false; $('#banner').hidden = true; $('#stopBtn').hidden = true; updateButtons();
       await seekTo(c.start); requestPreview();
     }
@@ -4044,7 +4060,31 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       v.src = u;
     });
   }
-  let WC_OK = true, lastFastErr = '', fastRate = 2;
+  // Output size presets: video bits per second (normal recorder / fast engine) and sound bits per second.
+  const SIZE_PRESETS = { tiny: [2.5e6, 2.5e6, 96000], small: [4e6, 4e6, 128000], bal: [6e6, 6e6, 128000], high: [8e6, 14e6, 192000] };
+  function sizeBits(fast) {
+    const el = $('#fileSize'), k = el && SIZE_PRESETS[el.value] ? el.value : 'high', p = SIZE_PRESETS[k];
+    return { v: fast ? p[1] : p[0], a: (fast && k === 'high') ? 128000 : p[2] };
+  }
+  let WC_OK = true, lastFastErr = '', fastRate = 2, fastRunning = false, fastHidden = false;
+  document.addEventListener('visibilitychange', () => { if (fastRunning && document.hidden) fastHidden = true; });
+  function fastWhyText(msg, hidden) {
+    if (hidden) return 'you left this page (or switched tab/app) while it was working, so the browser paused it.';
+    if (/noaac/.test(msg)) return 'this device cannot make AAC sound, which iPhone and Instagram need.';
+    if (/noaudio/.test(msg)) return 'the sound encoder gave no sound.';
+    if (/nosound/.test(msg)) return 'the finished clip had no sound, although the video has sound.';
+    if (/unplayable/.test(msg)) return 'the finished file would not play back.';
+    if (/empty/.test(msg)) return 'the finished file was empty.';
+    if (/stopped delivering/.test(msg)) return 'the source video stopped delivering pictures.';
+    if (/no pictures/.test(msg)) return 'no pictures were read from the source video.';
+    return 'an unexpected error (' + String(msg).slice(0, 90) + ').';
+  }
+  function showFastWhy(why) {
+    const cb = $('#fastEng'); if (cb) cb.checked = false;
+    let el = $('#fastWhy');
+    if (!el) { el = document.createElement('div'); el.id = 'fastWhy'; el.className = 'note'; el.dataset.kind = 'bad'; el.style.cssText = 'margin:2px 0 8px;font-size:13px'; const row = $('#fastRow'); row.parentNode.insertBefore(el, row.nextSibling); }
+    el.textContent = 'Fast engine switched off: ' + why + ' Clips use the normal recorder. Tick the box again to retry.'; el.hidden = false;
+  }
   // While one clip is being made on its own, its Make clip button is replaced by Cancel.
   async function makeClip(c, inBatch) {
     if (S.busy) return;
@@ -4061,7 +4101,9 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   async function makeClipInner(c, inBatch) {
     closeAllClipPreviews();
     if (WC_FAST && WC_OK && $('#fastEng').checked) { if (await makeClipFast(c, inBatch)) { afterMade(c); return; } if (S.cancel) return; }
+    const why = c.fastWhy; c.fastWhy = null;
     await makeClipRealtime(c, inBatch);
+    if (why && c.blob && c.note) c.note.textContent += ' · fast engine failed: ' + why.replace(/\.$/, '');
     afterMade(c);
   }
   // Clips are never downloaded on their own: they wait here until you tap Save video.
@@ -4082,7 +4124,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     if (o.haveAudio && recDest) recDest.stream.getAudioTracks().forEach(t => out.addTrack(t));
     const mime = pickMime();
     let rec;
-    try { rec = new MediaRecorder(out, { mimeType: mime || undefined, videoBitsPerSecond: 8000000, audioBitsPerSecond: 192000 }); }
+    try { rec = new MediaRecorder(out, { mimeType: mime || undefined, videoBitsPerSecond: sizeBits(false).v, audioBitsPerSecond: sizeBits(false).a }); }
     catch (e) { rec = new MediaRecorder(out); }
     const chunks = [];
     rec.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
@@ -4425,7 +4467,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       try {
         localStorage.setItem(SET_KEY, JSON.stringify({
           bg: S.bg, bgMode: S.bgMode, bgBlur: $('#bgBlur').value, bgOpacity: $('#bgOpacity').value, ar: S.ar,
-          qN: $('#qN').value, qMin: $('#qMin').value, qMax: $('#qMax').value, aDelay: $('#aDelay').value
+          fs: $('#fileSize').value, qN: $('#qN').value, qMin: $('#qMin').value, qMax: $('#qMax').value, aDelay: $('#aDelay').value
         }));
       } catch (e) { /* storage blocked: fine */ }
     }, 300);
@@ -4440,6 +4482,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       if (o.bgOpacity != null) { $('#bgOpacity').value = o.bgOpacity; $('#bgOpacity').dispatchEvent(new Event('input')); }
       if (o.ar && RATIOS.some(r => r[0] === o.ar)) setRatio(o.ar);
       if (o.aDelay != null) setAudioDelay(o.aDelay);
+      if (o.fs && SIZE_PRESETS[o.fs]) $('#fileSize').value = o.fs;
       if (o.qN) $('#qN').value = o.qN;
       if (o.qMin) $('#qMin').value = o.qMin;
       if (o.qMax != null) $('#qMax').value = o.qMax;
@@ -4485,6 +4528,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   $('#fastRow').hidden = !WC_FAST;
   if (WC_FAST) {
     $('#fastEng').checked = false;
+    $('#fastEng').addEventListener('change', () => { if ($('#fastEng').checked) { WC_OK = true; lastFastErr = ''; fastRate = 2; const w = $('#fastWhy'); if (w) w.hidden = true; } });
     $('#banner').textContent = 'Recording at normal speed. Keep this screen on and this tab open until it finishes.';
   } else {
     $('#banner').textContent = 'This browser has no WebCodecs encoders, so clips record at normal speed. Keep this screen on and this tab open until it finishes.';
