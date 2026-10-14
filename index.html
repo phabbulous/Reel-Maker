@@ -3887,6 +3887,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
         if (!blob.size) throw new Error('empty');
         if (!(await blobPlays(blob))) throw new Error('unplayable');
+        // Sound check: some phones write an MP4 whose sound track is silent or broken. If the source has sound here but the finished clip decodes to silence, use the normal recorder instead.
+        { const ok = await fastAudioOK(blob, abuf, s0, s1); if (ok === false) throw new Error('nosound'); }
         c.blob = blob; c.ext = 'mp4';
         c.bar.style.width = '100%';
         noteOf(c, 'Done · ' + fmt(start) + ' to ' + fmt(end) + ' · ' + dur.toFixed(1) + ' s · ' + mb(blob.size) + ' · MP4 (fast, ' + aCodecLabel + ', ' + FPS + ' fps, exact sync)', 'ok');
@@ -3894,7 +3896,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       }
     } catch (e) {
       if (S.cancel && /cancelled/.test(e && e.message || '')) { noteOf(c, 'Stopped. Nothing was kept for this clip.'); c.bar.style.width = '0%'; }
-      else { engineFailed = true; WC_OK = false; lastFastErr = String(e && e.message || e); try { console.warn('fast engine failed:', e); } catch (x) { /* ignore */ } c.blob = null; c.resbtns.hidden = true; noteOf(c, 'The fast engine did not work here (' + lastFastErr.slice(0, 80) + '), switching to the normal recorder…'); }
+      else { engineFailed = true; WC_OK = false; lastFastErr = String(e && e.message || e); if (/nosound|noaudio|noaac/.test(lastFastErr)) { try { localStorage.setItem('reelmaker.fastbad.v1', lastFastErr); } catch (x) { /* ignore */ } } try { console.warn('fast engine failed:', e); } catch (x) { /* ignore */ } c.blob = null; c.resbtns.hidden = true; noteOf(c, 'The fast engine did not work here (' + lastFastErr.slice(0, 80) + '), switching to the normal recorder…'); }
     } finally {
       try { vEnc && vEnc.close(); } catch (e) { /* ignore */ }
       try { aEnc && aEnc.close(); } catch (e) { /* ignore */ }
@@ -3905,6 +3907,20 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     return !engineFailed;
   }
 
+  // true = sound present, false = source has sound but the clip decodes silent/broken, null = could not tell.
+  async function fastAudioOK(blob, abuf, s0, s1) {
+    try {
+      let peak = 0; const d0 = abuf.getChannelData(0), step = Math.max(1, Math.floor((s1 - s0) / 20000));
+      for (let i = s0; i < s1; i += step) { const a = Math.abs(d0[i]); if (a > peak) peak = a; }
+      if (peak < 0.003) return null; // the source is silent here, nothing to check
+      const AC = window.AudioContext || window.webkitAudioContext, ac = new AC();
+      try {
+        const buf = await Promise.race([ac.decodeAudioData(await blob.arrayBuffer()), new Promise((_, rej) => setTimeout(() => rej(new Error('t')), 15000))]);
+        let p2 = 0; for (let ch = 0; ch < buf.numberOfChannels; ch++) { const d = buf.getChannelData(ch), st = Math.max(1, Math.floor(d.length / 40000)); for (let i = 0; i < d.length; i += st) { const a = Math.abs(d[i]); if (a > p2) p2 = a; } }
+        return p2 >= peak * 0.05;
+      } finally { try { ac.close(); } catch (e) { /* ignore */ } }
+    } catch (e) { return e && e.name === 'EncodingError' ? false : null; }
+  }
   function blobPlays(blob) {
     return new Promise(res => {
       const v = document.createElement('video'), u = URL.createObjectURL(blob);
@@ -4333,8 +4349,9 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   drawComposite(pctx, null, true);
   $('#fastRow').hidden = !WC_FAST;
   if (WC_FAST) {
-    $('#fastEng').checked = true;
-    $('#banner').textContent = 'Fast engine is on. Clips are built frame by frame. Keep this screen on until it finishes.';
+    let fastBad = ''; try { fastBad = localStorage.getItem('reelmaker.fastbad.v1') || ''; } catch (e) { /* ignore */ }
+    $('#fastEng').checked = !fastBad;
+    $('#banner').textContent = fastBad ? 'Recording at normal speed (the fast engine gave no sound on this device before, so it was switched off; you can tick it again). Keep this screen on until it finishes.' : 'Fast engine is on. Clips are built frame by frame. Keep this screen on until it finishes.';
   } else {
     $('#banner').textContent = 'This browser has no WebCodecs encoders, so clips record at normal speed. Keep this screen on and this tab open until it finishes.';
   }
