@@ -87,7 +87,7 @@ Open **Canvas: size, background & video position** under the preview.
 ### Preview player
 Start and End boxes (v4.7): each has -1s and +1s buttons, and the same on noted moments. Hold to repeat. Start can't pass End, a clip stays at least 1 second long, and the canvas jumps to the new start (or the last moment when you change End).
 
-v4.11: each clip has its own Audio sync box (the Settings box is only the starting value; the Calibrate button measures it on your device). The normal recorder now captures each source frame exactly once and starts on the first moving frame. The fast engine is on by default with automatic fallback, and its sound/picture timing is exact, so Audio sync only affects the normal recorder.
+v4.11: each clip has its own Audio sync box (the Settings box is only the starting value; the Calibrate button measures it on your device). The normal recorder now captures each source frame exactly once and starts on the first moving frame. The fast engine is off by default (tick it to try it); if it fails, or its finished clip decodes to silence while the source has sound, it switches to the normal recorder by itself and stays off on that device until you tick it again, and its sound/picture timing is exact, so Audio sync only affects the normal recorder.
 
 v4.10: every video has a name box; saved clips are named "Name - clip 1.mp4", "Name - clip 2.mp4" and so on (empty = file name; a clip's own File name box wins). Audio sync (ms) sets how far the recorded sound is held back so it matches the picture (default 90; raise it if the sound comes first, lower it if it comes late). The blurred background is cached so recording with blur stays smooth.
 

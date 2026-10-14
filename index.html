@@ -260,7 +260,7 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
       <button id="makeAll" class="btn primary small" type="button" disabled>Make all clips</button>
       <button id="stopBtn" class="btn small" type="button" hidden>Stop</button>
     </div>
-    <label class="chk" id="fastRow" style="margin-bottom:4px" hidden><input type="checkbox" id="fastEng"><span>Fast engine (on by default). Builds each frame exactly instead of recording in real time, so there is no freeze at the start. If it fails here, it switches back to the normal recorder by itself. Untick it to always use the normal recorder.</span></label>
+    <label class="chk" id="fastRow" style="margin-bottom:4px" hidden><input type="checkbox" id="fastEng"><span>Fast engine (off by default). Builds each frame exactly instead of recording in real time. If it fails here, or its clip has no sound, it switches back to the normal recorder by itself.</span></label>
     <div id="banner" class="banner" hidden>Recording runs at normal speed. Keep this screen on and this tab open until it finishes.</div>
     <div class="clips-grid">
       <div class="pvcol">
@@ -4349,9 +4349,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   drawComposite(pctx, null, true);
   $('#fastRow').hidden = !WC_FAST;
   if (WC_FAST) {
-    let fastBad = ''; try { fastBad = localStorage.getItem('reelmaker.fastbad.v1') || ''; } catch (e) { /* ignore */ }
-    $('#fastEng').checked = !fastBad;
-    $('#banner').textContent = fastBad ? 'Recording at normal speed (the fast engine gave no sound on this device before, so it was switched off; you can tick it again). Keep this screen on until it finishes.' : 'Fast engine is on. Clips are built frame by frame. Keep this screen on until it finishes.';
+    $('#fastEng').checked = false;
+    $('#banner').textContent = 'Recording at normal speed. Keep this screen on and this tab open until it finishes.';
   } else {
     $('#banner').textContent = 'This browser has no WebCodecs encoders, so clips record at normal speed. Keep this screen on and this tab open until it finishes.';
   }
