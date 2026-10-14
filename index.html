@@ -90,6 +90,9 @@ h3 { font-size: 14px; margin: 0; font-weight: 600; }
 input[type="number"], input[type="text"], textarea { font: 14px var(--font-ui); color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; min-width: 0; }
 input[type="number"] { text-align: center; font-family: var(--font-mono); }
 .hint { font-size: 12.5px; color: var(--muted); margin: 0; max-width: 70ch; }
+.replacebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; margin: 8px 0; border: 1px solid var(--line, #444); border-radius: 10px; font-size: 14px; }
+.replacebar span { flex: 1 1 100%; }
+.cancelbtn { min-width: 96px; }
 .clips-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 760px) { .clips-grid { grid-template-columns: 250px minmax(0, 1fr); } .pvcol { position: sticky; top: 16px; } }
 .pvcol { display: grid; gap: 8px; justify-items: center; }
@@ -334,7 +337,7 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
             <label>Shortest (s)<input id="qMin" type="text" inputmode="decimal" value="15" autocomplete="off"></label>
             <label>Longest (s)<input id="qMax" type="text" inputmode="decimal" value="" placeholder="whole video" autocomplete="off"></label>
           </div>
-          <p class="hint">Make all clips picks that many random clips from every ticked video, each with its own random length between Shortest and Longest, then records them one after another. Leave Longest empty to allow up to the whole video.</p>
+          <p class="hint">Make all clips picks that many random clips from every ticked video, each with its own random length between Shortest and Longest, then records them one after another. Leave Longest empty to allow up to the whole video. These settings apply to every ticked video in the list above; untick a video to leave it out.</p>
           <label class="chk"><input type="checkbox" id="qSame"><span>Exact length: every clip is the Shortest number of seconds</span></label>
           <div class="syncrow"><label for="aDelay">Default audio sync (ms)</label><button type="button" class="tstep" id="aDelayMinus" aria-label="Less delay">&minus;10</button><input id="aDelay" type="text" inputmode="numeric" value="90" autocomplete="off" aria-label="Default audio delay in milliseconds for new clips" ><button type="button" class="tstep" id="aDelayPlus" aria-label="More delay">+10</button></div>
           <p class="hint">Starting value for every new clip’s own Audio sync control (under each clip). Raise if sound comes before the picture. Used by the normal recorder only (the fast engine is always exact). Tap Calibrate to measure it on this device: it records a 3-second test clip and listens to it. Each clip can still be adjusted separately.</p>
@@ -346,6 +349,7 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
             <button id="analyze" class="btn small" type="button" disabled>Find busy moments</button>
             <button id="addClip" class="btn small" type="button" disabled>Add one at the playhead</button>
           </div>
+          <div class="replacebar" id="replaceBar" role="alert" hidden><span id="replaceMsg"></span><button type="button" class="btn small primary" id="replaceYes">Replace</button><button type="button" class="btn small" id="replaceNo">Cancel</button></div>
           <p class="hint" id="analyzeNote">Picks start at random places across the whole video and may overlap. Each press gives a new set.</p>
         </div>
         <div class="gen lines">
@@ -2689,11 +2693,11 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       '<div class="timeapply"><button type="button" class="btn primary small" data-act="use-times">Use now</button><span class="timemsg" role="status"></span></div>' +
       '<div class="syncrow clip-sync"><label>Audio sync (ms)</label><button type="button" class="tstep" data-adelay="-10" aria-label="Less delay">&minus;10</button><input type="text" class="adelay-in" inputmode="numeric" value="" autocomplete="off" aria-label="Audio delay for this clip in milliseconds"><button type="button" class="tstep" data-adelay="10" aria-label="More delay">+10</button></div>' +
       '<div class="layers listcol"></div>' +
-      '<div class="actions"><button type="button" class="btn small" data-act="add-layer">Add another text</button><button type="button" class="btn small" data-act="look">Show this clip</button><button type="button" class="btn primary small" data-act="make">Make clip</button></div>' +
+      '<div class="actions"><button type="button" class="btn small" data-act="add-layer">Add another text</button><button type="button" class="btn small" data-act="look">Show this clip</button><button type="button" class="btn primary small" data-act="make">Make clip</button><button type="button" class="btn small cancelbtn" data-act="cancel" hidden>Cancel</button></div>' +
       '<div class="clipprev" hidden><canvas width="360" height="640"></canvas><span class="hint">Tap the preview to pause or play.</span><div class="row"><button type="button" class="btn small" data-act="replay">Replay</button><button type="button" class="btn small" data-act="hideprev">Close</button></div></div>' +
       '<div class="res" hidden><div class="bar"><i></i></div><p class="note"></p><div class="actions resbtns" hidden><input type="text" class="fname" placeholder="File name (optional)" aria-label="File name" autocomplete="off"><button type="button" class="btn small" data-act="save">Save video</button>' + (CAN_SHARE_BTN ? '<button type="button" class="btn small" data-act="share">Share</button>' : '') + '<button type="button" class="btn small" data-act="watch">Watch</button></div><div class="resv"></div></div>';
     const c = {
-      id, el, v, start, end, layers: [], stale: false, blob: null, ext: '', url: null,
+      id, el, v, start, end, origStart: start, origEnd: end, manual: false, layers: [], stale: false, blob: null, ext: '', url: null,
       aDelay: audioDelayMs(),
       inS: $('input[id^="s"]', el), inE: $('input[id^="e"]', el), layersEl: $('.layers', el),
       dur: $('.dur', el), res: $('.res', el), bar: $('.bar > i', el), note: $('.note', el), resbtns: $('.resbtns', el), resv: $('.resv', el),
@@ -2984,6 +2988,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     if (act === 'replay') { replayClipPreview(c); return; }
     if (act === 'hideprev') { closeClipPreview(c); return; }
     if (act === 'make') return makeClip(c);
+    if (act === 'cancel') { c.cancelAsked = true; S.cancel = true; const cb = c.el.querySelector('button[data-act="cancel"]'); if (cb) { cb.disabled = true; cb.textContent = 'Stopping…'; } return; }
     if (act === 'save') return saveClip(c);
     if (act === 'share') return shareClip(c);
     if (act === 'watch') return watchClip(c);
@@ -3019,12 +3024,15 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const lo = Math.min(minLen(), S.dur), hi = Math.max(lo, numOr('#qMax', S.dur));
     const len = Math.min(S.dur, r1(rand(lo, hi)));
     const s = clamp(playheadNow(), 0, Math.max(0, S.dur - len));
-    setActive(addClip(cur, r1(s), r1(Math.min(S.dur, s + len)), null));
+    { const nc = addClip(cur, r1(s), r1(Math.min(S.dur, s + len)), null); nc.manual = true; setActive(nc); }
   });
   $('#fullBtn').addEventListener('click', () => {
     if (S.busy) return;
-    targets().forEach(v => { clearClips(v); addClip(v, 0, r1(v.dur), null); });
-    if (cur) setActive(S.clips[0] || null);
+    guardReplace(true, () => {
+      if (S.busy) return;
+      targets().forEach(v => { clearClips(v); addClip(v, 0, r1(v.dur), null); });
+      if (cur) setActive(S.clips[0] || null);
+    });
   });
   $('#qSame').addEventListener('change', () => { $('#qMax').disabled = $('#qSame').checked; });
 
@@ -3068,14 +3076,31 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   }
   const targets = () => videos.filter(v => v.include || videos.length === 1);
 
+  // Asks before replacing clips you have put work into (made clips, hand-set times, hand-added or duplicated clips; typed text too when using the full video).
+  let replaceFn = null;
+  const workedOn = (c, withText) => !!(c.blob || c.manual || c.start !== c.origStart || c.end !== c.origEnd || (withText && hasText(c)));
+  function hideReplace() { replaceFn = null; $('#replaceBar').hidden = true; }
+  function guardReplace(withText, fn) {
+    const hit = targets().filter(v => v.clips.some(c => workedOn(c, withText)));
+    if (!hit.length) { hideReplace(); fn(); return; }
+    replaceFn = fn;
+    $('#replaceMsg').textContent = 'This will replace the clips on ' + hit.length + (hit.length === 1 ? ' video' : ' videos') + ', including ones you worked on.';
+    $('#replaceBar').hidden = false;
+  }
+  $('#replaceYes').addEventListener('click', () => { const f = replaceFn; hideReplace(); if (f && !S.busy) f(); });
+  $('#replaceNo').addEventListener('click', hideReplace);
   $('#quickFill').addEventListener('click', () => {
+    if (S.busy || !cur) return;
+    guardReplace(false, doQuickFill);
+  });
+  function doQuickFill() {
     if (S.busy || !cur) return;
     const st = settings();
     targets().forEach(v => pickFor(v, st));
     setActive(S.clips[0] || null);
     if ($('#lines').value.trim()) applyLines();
     $('#analyzeNote').textContent = 'Picked ' + st.n + ' clips for ' + targets().length + (targets().length === 1 ? ' video' : ' videos') + '. Add text below, then tap Make all clips.';
-  });
+  }
 
   function applyLines() {
     let ls = $('#lines').value.split('\n').map(x => x.trim()).filter(Boolean);
@@ -3134,7 +3159,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       note.textContent = 'Done. Found ' + cuts.length + ' scene change' + (cuts.length === 1 ? '' : 's') + (audio ? ', and used the sound' : ', picture only (sound could not be read)') + '. Picks now lean toward the busier parts. It finds energy, not meaning, so still check each clip.';
     } catch (e) { note.textContent = 'Could not analyze this video.'; }
     await seekTo(0);
-    S.busy = false; updateButtons(); requestPreview();
+    S.busy = false; updateButtons(); requestPreview(); renderVideoList();
   }
   $('#analyze').addEventListener('click', analyze);
 
@@ -3371,7 +3396,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = v.include || videos.length === 1; cb.disabled = videos.length === 1; cb.setAttribute('aria-label', 'Use ' + v.name);
       cb.addEventListener('change', () => { v.include = cb.checked; });
       const nm = document.createElement('button'); nm.type = 'button'; nm.className = 'btn quiet vname';
-      nm.textContent = (v.customName || v.name) + (v.dur ? ' · ' + fmt(v.dur) : '') + ' · ' + v.clips.length + (v.clips.length === 1 ? ' clip' : ' clips');
+      nm.textContent = (v.customName || v.name) + (v.dur ? ' · ' + fmt(v.dur) : '') + ' · ' + v.clips.length + (v.clips.length === 1 ? ' clip' : ' clips') + (v.score ? ' · analysed' : '');
       nm.addEventListener('click', async () => { if (!S.busy && v !== cur) await useVideo(v); });
       const cn = document.createElement('input'); cn.type = 'text'; cn.className = 'vname-in';
       cn.placeholder = v.name; cn.value = v.customName || ''; cn.setAttribute('aria-label', 'Name for ' + v.name); cn.autocomplete = 'off';
@@ -3379,7 +3404,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       // No list rebuild here: rebuilding would steal the cursor from the next name box you tap into.
       cn.addEventListener('change', () => {
         v.customName = cn.value.trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').slice(0, 80);
-        nm.textContent = (v.customName || v.name) + (v.dur ? ' · ' + fmt(v.dur) : '') + ' · ' + v.clips.length + (v.clips.length === 1 ? ' clip' : ' clips');
+        nm.textContent = (v.customName || v.name) + (v.dur ? ' · ' + fmt(v.dur) : '') + ' · ' + v.clips.length + (v.clips.length === 1 ? ' clip' : ' clips') + (v.score ? ' · analysed' : '');
       });
       const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'btn quiet small'; rm.textContent = 'Remove';
       rm.addEventListener('click', () => removeVideo(v));
@@ -3581,7 +3606,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       const s = clamp(n.s != null ? n.s : n.t, 0, S.dur);
       const e2 = n.e != null ? Math.min(S.dur, n.e) : Math.min(S.dur, s + 10);
       if (e2 - s < 1) return;
-      setActive(addClip(cur, r1(s), r1(e2), null));
+      { const nc = addClip(cur, r1(s), r1(e2), null); nc.manual = true; setActive(nc); }
       document.getElementById('h-clips').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     else if (nd !== undefined) {
@@ -3640,7 +3665,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   function dupClip(c) {
     if (S.busy) return;
     const v = c.v, n = addClip(v, c.start, c.end, c.layers);
-    n.aDelay = c.aDelay; n.aDelayUser = c.aDelayUser;
+    n.aDelay = c.aDelay; n.aDelayUser = c.aDelayUser; n.manual = true;
     if (n.inADelay) n.inADelay.value = n.aDelay;
     v.clips.splice(v.clips.indexOf(n), 1); v.clips.splice(v.clips.indexOf(c) + 1, 0, n);
     c.el.after(n.el); retitle(v); renderVideoList(); setActive(n);
@@ -3797,7 +3822,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const start = c.start, end = Math.min(c.end, S.dur);
     if (end - start < 1) { noteOf(c, 'Set an end time after the start.', 'bad'); return; }
     c.stale = false; c.el.classList.remove('stale');
-    S.busy = true; S.cancel = false; updateButtons(); setActive(c);
+    S.busy = true; S.cancel = !!c.cancelAsked; updateButtons(); setActive(c);
     if (c.url) { URL.revokeObjectURL(c.url); c.url = null; } c.blob = null; c.resv.textContent = ''; c.resbtns.hidden = true;
     c.bar.style.width = '0%'; noteOf(c, 'Getting ready…');
     $('#banner').hidden = false; $('#stopBtn').hidden = false;
@@ -3895,7 +3920,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         c.resbtns.hidden = false;
       }
     } catch (e) {
-      if (S.cancel && /cancelled/.test(e && e.message || '')) { noteOf(c, 'Stopped. Nothing was kept for this clip.'); c.bar.style.width = '0%'; }
+      if (S.cancel) { noteOf(c, 'Stopped. Nothing was kept for this clip.'); c.bar.style.width = '0%'; }
       else { engineFailed = true; WC_OK = false; lastFastErr = String(e && e.message || e); if (/nosound|noaudio|noaac/.test(lastFastErr)) { try { localStorage.setItem('reelmaker.fastbad.v1', lastFastErr); } catch (x) { /* ignore */ } } try { console.warn('fast engine failed:', e); } catch (x) { /* ignore */ } c.blob = null; c.resbtns.hidden = true; noteOf(c, 'The fast engine did not work here (' + lastFastErr.slice(0, 80) + '), switching to the normal recorder…'); }
     } finally {
       try { vEnc && vEnc.close(); } catch (e) { /* ignore */ }
@@ -3933,9 +3958,22 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     });
   }
   let WC_OK = true, lastFastErr = '';
+  // While one clip is being made on its own, its Make clip button is replaced by Cancel.
   async function makeClip(c, inBatch) {
+    if (S.busy) return;
+    const mk = c.el.querySelector('button[data-act="make"]'), cn = c.el.querySelector('button[data-act="cancel"]');
+    c.cancelAsked = false;
+    if (!inBatch && mk && cn) { mk.hidden = true; cn.hidden = false; cn.disabled = false; cn.textContent = 'Cancel'; }
+    try { await makeClipInner(c, inBatch); }
+    finally {
+      c.cancelAsked = false;
+      if (mk) mk.hidden = false;
+      if (cn) { cn.hidden = true; cn.disabled = false; cn.textContent = 'Cancel'; }
+    }
+  }
+  async function makeClipInner(c, inBatch) {
     closeAllClipPreviews();
-    if (WC_FAST && WC_OK && $('#fastEng').checked) { if (await makeClipFast(c, inBatch)) { afterMade(c); return; } }
+    if (WC_FAST && WC_OK && $('#fastEng').checked) { if (await makeClipFast(c, inBatch)) { afterMade(c); return; } if (S.cancel) return; }
     await makeClipRealtime(c, inBatch);
     afterMade(c);
   }
@@ -4022,7 +4060,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const start = c.start, end = Math.min(c.end, S.dur);
     if (end - start < 1) { noteOf(c, 'Set an end time after the start.', 'bad'); return; }
     c.stale = false; c.el.classList.remove('stale');
-    S.busy = true; S.cancel = false; updateButtons(); setActive(c);
+    S.busy = true; S.cancel = !!c.cancelAsked; updateButtons(); setActive(c);
     if (c.url) { URL.revokeObjectURL(c.url); c.url = null; } c.blob = null; c.resv.textContent = ''; c.resbtns.hidden = true;
     c.bar.style.width = '0%'; noteOf(c, 'Getting ready…');
     $('#banner').hidden = false; $('#stopBtn').hidden = false;
@@ -4058,7 +4096,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         c.resbtns.hidden = false;
       }
     } catch (e) {
-      if (S.cancel && /cancelled/.test(e && e.message || '')) noteOf(c, 'Stopped. Nothing was kept for this clip.');
+      if (S.cancel) { noteOf(c, 'Stopped. Nothing was kept for this clip.'); c.bar.style.width = '0%'; }
       else noteOf(c, 'Recording failed. ' + (e && e.name === 'NotAllowedError' ? 'The browser blocked playback; tap Make clip again.' : 'Try again, or choose a shorter clip.'), 'bad');
     } finally {
       if (monitor) monitor.gain.value = 1;
