@@ -1,4 +1,4 @@
-# Reel Maker v4.10: complete guide
+# Reel Maker v4.11: complete guide
 
 Reel Maker is one web page (`index.html`). It crops the bars off your videos, puts the scene on a canvas of your choice (black by default, any colour, or a blurred copy of the video), adds your on-screen text, cuts random clips, and makes MP4 files. Everything runs in your own browser. Your videos are never uploaded, and it costs nothing to run.
 
@@ -87,6 +87,8 @@ Open **Canvas: size, background & video position** under the preview.
 ### Preview player
 Start and End boxes (v4.7): each has -1s and +1s buttons, and the same on noted moments. Hold to repeat. Start can't pass End, a clip stays at least 1 second long, and the canvas jumps to the new start (or the last moment when you change End).
 
+v4.11: each clip has its own Audio sync box (the Settings box is only the starting value; the Calibrate button measures it on your device). The normal recorder now captures each source frame exactly once and starts on the first moving frame. The fast engine is on by default with automatic fallback, and its sound/picture timing is exact, so Audio sync only affects the normal recorder.
+
 v4.10: every video has a name box; saved clips are named "Name - clip 1.mp4", "Name - clip 2.mp4" and so on (empty = file name; a clip's own File name box wins). Audio sync (ms) sets how far the recorded sound is held back so it matches the picture (default 90; raise it if the sound comes first, lower it if it comes late). The blurred background is cached so recording with blur stays smooth.
 
 v4.9: each clip has ONE Use now button. Change Start and/or End (type it, or use -1s/+1s), then press Use now: the clip takes those times and the canvas jumps to its start. Press Make clip to build the video again. Set start here and Set end here copy the time of the player you used last. Duplicate copies a clip right below itself. Each finished clip has a File name box. Your background, blur, aspect ratio and clip counts and lengths are remembered on this device. Older note, v4.8: the Use now buttons, Note this moment and add clip here take the time from whichever player you used last (source video, preview bar, or Show this clip). After Use now the canvas jumps to the clip's new start or end.
@@ -166,4 +168,4 @@ Common fixes:
 - Videos, clips and text stay on your device. The only outside requests are for the fonts and the page itself.
 - Making clips can be real time (a 20-second clip takes about 20 seconds) when the fast engine is not available.
 - Very large videos can be slow or run out of memory on a phone.
-- Tested here: desktop Chrome (download, auto-download, share, iPhone-style save path, colour and position controls). Not tested here: real iPhone Safari, real Android Chrome, and the fast engine in a full browser. Do a two-clip test first.
+- Tested here: desktop Chrome (download, auto-download, share, iPhone-style save path, colour and position controls). Not tested here: real iPhone Safari and real Android Chrome. The iPhone default sound sync is a guess until you tap Calibrate. Do a two-clip test first.

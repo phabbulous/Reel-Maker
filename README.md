@@ -2,7 +2,7 @@
 
 Turn any video into 9:16 reels in your browser. Reel Maker crops off the bars and burned-in captions, centres the scene on a canvas you choose, adds your own on-screen text, cuts random clips, and gives you MP4 files. Everything runs on your device. Your videos are never uploaded.
 
-Version 4.10 · one file: `index.html` · no install, no account, free.
+Version 4.11 · one file: `index.html` · no install, no account, free.
 
 ---
 
@@ -29,6 +29,7 @@ Version 4.10 · one file: `index.html` · no install, no account, free.
 - **Canvas:** 9:16, 1:1, 4:5 or 16:9. Any background colour (picker, swatches, full palette), or a blurred copy of the video. Move and resize the video on the canvas.
 - **Start and End nudge buttons (v4.7):** next to every Start and End box (and on noted moments) are -1s and +1s buttons. Hold one to keep stepping. Start can't pass End, and a clip stays at least 1 second long.
 - **Use now (v4.9):** one Use now button per clip. Change Start and/or End (type, or use -1s/+1s), press Use now, and that clip takes those times. Then press Make clip to build the video again. "Set start here" and "Set end here" copy the time of the player you used last.
+- **Sound sync per clip, frame-exact recording, calibration (v4.11):** every clip now has its own Audio sync (ms) box with -10/+10 buttons (under its Start/End). The one in Settings is the starting value for clips you have not changed by hand. Tap "Calibrate sound sync on this device" in Settings: it records a 3-second test and sets the starting value for you. The normal recorder now grabs each source frame once (a 24 fps film stays 24 fps, no repeats or skips) and starts recording only when the picture is really moving, so there is no frozen start. The fast engine is on by default and falls back to the normal recorder if it fails; it keeps exact sound and picture timing on its own, so the Audio sync box only affects the normal recorder.
 - **Video names (v4.10):** each video in the list has a name box. Saved clips are named "Your name - clip 1.mp4", "- clip 2" and so on. Leave it empty to use the file name. A clip's own File name box still wins for that clip.
 - **Sound sync and smoother blur (v4.10):** the sound used to land about 0.09 s before the picture in made clips. It is now held back to match. If it is still off on your device, change "Audio sync (ms)": raise it if the sound comes first, lower it if the sound comes late. The blurred background is also much lighter to record, so clips with blur are smoother.
 - **More in v4.9:** Duplicate clip, a File name box on each finished clip, and remembered settings (background, blur, aspect ratio, clip counts and lengths).
@@ -109,7 +110,7 @@ Videos, clips and text stay on your device. The only outside requests are the fo
 - Making clips normally runs in real time.
 - Very large or 4K videos can be slow or run out of memory on a phone.
 - The busy-moments finder cannot understand what is happening in a scene.
-- Tested in desktop Chrome. Not tested on real iPhone Safari, real Android Chrome, or the faster engine in a full browser, so run a short test first.
+- Tested in desktop Chrome. Not tested on real iPhone Safari or real Android Chrome (the start-freeze and sound-sync fixes were measured in desktop Chrome only), so run a short test first and tap Calibrate.
 
 ---
 
