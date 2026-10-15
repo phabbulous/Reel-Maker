@@ -263,14 +263,6 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
       <button id="makeAll" class="btn primary small" type="button" disabled>Make all clips</button>
       <button id="stopBtn" class="btn small" type="button" hidden>Stop</button>
     </div>
-    <div class="syncrow" id="sizeRow" style="margin-bottom:4px"><label for="fileSize">File size</label>
-      <select id="fileSize" aria-label="Output file size">
-        <option value="tiny">Tiny (about 20 MB per minute)</option>
-        <option value="small">Small (about 30 MB per minute)</option>
-        <option value="bal">Balanced (about 45 MB per minute)</option>
-        <option value="high" selected>Large, best quality (60 MB per minute, 105 with the fast engine)</option>
-      </select></div>
-    <p class="hint" id="sizeHint" style="margin:0 0 6px">Large is the best quality. Instagram shrinks every upload to around 4 Mbps anyway, so a smaller size looks the same once it is posted. Sound quality is the same in every size. Applies to clips you make from now on.</p>
     <label class="chk" id="fastRow" style="margin-bottom:4px" hidden><input type="checkbox" id="fastEng"><span>Fast engine (off by default). Builds each frame exactly instead of recording in real time. If it fails here, or its clip has no sound, it switches back to the normal recorder by itself.</span></label>
     <div id="banner" class="banner" hidden>Recording runs at normal speed. Keep this screen on and this tab open until it finishes.</div>
     <div class="clips-grid">
@@ -2666,7 +2658,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const box = document.createElement('div'); box.className = 'layer'; box._layer = L; L._el = box;
     const first = c.layers.indexOf(L) === 0;
     box.innerHTML =
-      '<label class="textfield"><span class="ltitle"></span><textarea rows="2" maxlength="160" placeholder="Press Enter where you want a new line"></textarea></label>' +
+      '<label class="textfield"><span class="ltitle"></span><textarea rows="2" maxlength="160" placeholder="Two short lines work best"></textarea></label>' +
       '<details><summary>Position, size and lines</summary>' +
         '<div class="lgrid">' +
           '<label>Font<select data-k="font">' + FONTS.map(f => '<option value="' + f[0] + '">' + f[1] + '</option>').join('') + '</select></label>' +
@@ -3872,8 +3864,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         error: e => { encErr = encErr || e; }
       });
       aEnc.configure(useAAC
-        ? { codec: 'mp4a.40.2', sampleRate: sr, numberOfChannels: nch, bitrate: sizeBits(true).a }
-        : { codec: 'opus', sampleRate: sr, numberOfChannels: nch, bitrate: sizeBits(true).a });
+        ? { codec: 'mp4a.40.2', sampleRate: sr, numberOfChannels: nch, bitrate: 128000 }
+        : { codec: 'opus', sampleRate: sr, numberOfChannels: nch, bitrate: 128000 });
       // Audio first: slice the clip range into small frames. The fast engine stamps picture and sound exactly.
       const PER = 1024, frames = Math.max(0, s1 - s0);
       for (let off = 0; off < frames; off += PER) {
@@ -3889,7 +3881,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       if (!S.cancel && !aList.length) throw new Error('noaudio'); // encoder gave no audio: use the normal recorder instead
       const makeVEnc = (onChunk, onErr) => {
         const e = new VideoEncoder({ output: onChunk, error: onErr });
-        e.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: sizeBits(true).v, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } });
+        e.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: 14000000, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } });
         return e;
       };
       const ft = Math.round(1e6 / FPS), keyEvery = Math.max(1, Math.round(FPS * 2));
@@ -3902,7 +3894,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         try { vEnc && vEnc.close(); } catch (e) { /* ignore */ }
         let err2 = null;
         vEnc = makeVEnc((ch, meta) => { try { muxer.addVideoChunk(ch, meta); } catch (e) { err2 = err2 || e; } }, e => { err2 = err2 || e; });
-        encVid.pause(); encVid.playbackRate = rate || 1; const lockstep = !rate; // rate 0 = one picture at a time: the source is paused while each picture is processed, so a slow computer cannot make it skip
+        encVid.pause(); encVid.playbackRate = rate;
         let lastM = -1, lastAcc = -1, lastTs = -1, lastKey = -1, count = 0, dropped = 0, lastCb = performance.now(), heldByUs = false;
         const tPass = performance.now();
         // The very first picture is taken while the source is paused on the clip start. This also warms up drawing and the encoder, so nothing is missed once it starts playing.
@@ -3933,8 +3925,6 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
             if (settled) return;
             try { encVid.requestVideoFrameCallback(cb); } catch (e) { done('error'); return; } // always listen for the next picture first, so none is missed
             lastCb = performance.now();
-            if (lockstep) { try { encVid.pause(); } catch (e) { /* ignore */ } }
-            try {
             const mt = m.mediaTime;
             if (mt >= end - 0.0005) { done('ok'); return; }
             if (mt > lastM + srcDt * 0.1) {
@@ -3948,7 +3938,6 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
                 vEnc.encode(vf, { keyFrame: count === 0 || mt - lastKey >= 2 }); if (count === 0 || mt - lastKey >= 2) lastKey = mt;
                 vf.close(); count++;
                 if (err2) { done('error'); return; }
-                if (lockstep && count % 24 === 0 && performance.now() - tPass > 4000 && (performance.now() - tPass) / 1000 > (mt - start) * 1.15) { done('slow'); return; } // slower than the normal recorder would be
                 if (count % 12 === 0) {
                   c.bar.style.width = (clamp((mt - start) / (end - start), 0, 1) * 100).toFixed(1) + '%';
                   c.note.textContent = (batch ? batch + ' · ' : '') + 'Encoding ' + Math.max(0, mt - start).toFixed(1) + ' of ' + (end - start).toFixed(1) + ' s';
@@ -3956,7 +3945,6 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
                 if (vEnc.encodeQueueSize > 8 && !heldByUs) { heldByUs = true; encVid.pause(); } // let the encoder catch up without the source running ahead
               }
             }
-            } finally { if (lockstep && !settled && !heldByUs) encVid.play().catch(() => {}); }
           };
           try { encVid.requestVideoFrameCallback(cb); encVid.play().catch(() => done('error')); } catch (e) { done('error'); }
         });
@@ -3965,9 +3953,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         if (result === 'stalled') throw new Error('the source video stopped delivering pictures');
         if (result === 'cancel') return { r: 'cancel' };
         if (result === 'dropped') return { r: 'dropped' };
-        if (result === 'slow') throw new Error('tooslow');
         if (!count) throw new Error('no pictures were produced');
-        if (lastChance && dropped > Math.max(3, count * 0.01)) throw new Error('choppy ' + dropped);
         await vEnc.flush();
         if (err2) throw err2;
         return { r: 'ok', dropped };
@@ -3975,7 +3961,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       if (typeof encVid.requestVideoFrameCallback === 'function') {
         let res = { r: 'dropped' };
         // Faster than normal speed only if this computer keeps up without the browser skipping any picture; otherwise step down. The last rate that worked is remembered.
-        const rates = [2, 1, 0].filter(x => x <= fastRate);
+        const rates = [2, 1].filter(x => x <= fastRate);
         for (const rate of rates) {
           if (S.cancel) break;
           res = await forwardPass(rate, rate === rates[rates.length - 1]);
@@ -4067,13 +4053,6 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       v.src = u;
     });
   }
-  // Output size presets: video bits per second (normal recorder / fast engine) and sound bits per second.
-  const SIZE_PRESETS = { tiny: [2.5e6, 2.5e6], small: [4e6, 4e6], bal: [6e6, 6e6], high: [8e6, 14e6] };
-  function sizeBits(fast) {
-    const el = $('#fileSize'), k = el && SIZE_PRESETS[el.value] ? el.value : 'high', p = SIZE_PRESETS[k];
-    // Sound is never reduced: it is the same in every size (192 kbps normal recorder, 128 kbps fast engine).
-    return { v: fast ? p[1] : p[0], a: fast ? 128000 : 192000 };
-  }
   let WC_OK = true, lastFastErr = '', fastRate = 2, fastRunning = false, fastHidden = false;
   document.addEventListener('visibilitychange', () => { if (fastRunning && document.hidden) fastHidden = true; });
   function fastWhyText(msg, hidden) {
@@ -4083,10 +4062,6 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     if (/nosound/.test(msg)) return 'the finished clip had no sound, although the video has sound.';
     if (/unplayable/.test(msg)) return 'the finished file would not play back.';
     if (/empty/.test(msg)) return 'the finished file was empty.';
-    if (/tooslow/.test(msg)) return 'on this computer it cannot read the pictures faster than the normal recorder records them, so the normal recorder is quicker.';
-    if (/choppy/.test(msg)) return 'this computer could not read every picture of the video fast enough, so the clip would have come out choppy.';
-    if (/tooslow/.test(msg)) return 'this computer was too slow to build every picture of this clip quickly, so the normal recorder is used.';
-    if (/choppy/.test(msg)) return 'the browser skipped pictures, so the clip would have looked choppy.';
     if (/stopped delivering/.test(msg)) return 'the source video stopped delivering pictures.';
     if (/no pictures/.test(msg)) return 'no pictures were read from the source video.';
     return 'an unexpected error (' + String(msg).slice(0, 90) + ').';
@@ -4136,7 +4111,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     if (o.haveAudio && recDest) recDest.stream.getAudioTracks().forEach(t => out.addTrack(t));
     const mime = pickMime();
     let rec;
-    try { rec = new MediaRecorder(out, { mimeType: mime || undefined, videoBitsPerSecond: sizeBits(false).v, audioBitsPerSecond: sizeBits(false).a }); }
+    try { rec = new MediaRecorder(out, { mimeType: mime || undefined, videoBitsPerSecond: 8000000, audioBitsPerSecond: 192000 }); }
     catch (e) { rec = new MediaRecorder(out); }
     const chunks = [];
     rec.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
@@ -4479,7 +4454,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       try {
         localStorage.setItem(SET_KEY, JSON.stringify({
           bg: S.bg, bgMode: S.bgMode, bgBlur: $('#bgBlur').value, bgOpacity: $('#bgOpacity').value, ar: S.ar,
-          fsz: $('#fileSize').value, qN: $('#qN').value, qMin: $('#qMin').value, qMax: $('#qMax').value, aDelay: $('#aDelay').value
+          qN: $('#qN').value, qMin: $('#qMin').value, qMax: $('#qMax').value, aDelay: $('#aDelay').value
         }));
       } catch (e) { /* storage blocked: fine */ }
     }, 300);
@@ -4494,7 +4469,6 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       if (o.bgOpacity != null) { $('#bgOpacity').value = o.bgOpacity; $('#bgOpacity').dispatchEvent(new Event('input')); }
       if (o.ar && RATIOS.some(r => r[0] === o.ar)) setRatio(o.ar);
       if (o.aDelay != null) setAudioDelay(o.aDelay);
-      if (o.fsz && SIZE_PRESETS[o.fsz]) $('#fileSize').value = o.fsz;
       if (o.qN) $('#qN').value = o.qN;
       if (o.qMin) $('#qMin').value = o.qMin;
       if (o.qMax != null) $('#qMax').value = o.qMax;
