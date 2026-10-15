@@ -263,14 +263,6 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
       <button id="makeAll" class="btn primary small" type="button" disabled>Make all clips</button>
       <button id="stopBtn" class="btn small" type="button" hidden>Stop</button>
     </div>
-    <div class="syncrow" id="sizeRow" style="margin-bottom:4px"><label for="fileSize">File size</label>
-      <select id="fileSize" aria-label="Output file size">
-        <option value="tiny">Tiny (about 20 MB per minute)</option>
-        <option value="small">Small (about 30 MB per minute)</option>
-        <option value="bal">Balanced (about 45 MB per minute)</option>
-        <option value="high" selected>Large, best quality (60 MB per minute, 105 with the fast engine)</option>
-      </select></div>
-    <p class="hint" id="sizeHint" style="margin:0 0 6px">Large is the best quality. Instagram shrinks every upload to around 4 Mbps anyway, so a smaller size looks the same once it is posted. Applies to clips you make from now on.</p>
     <label class="chk" id="fastRow" style="margin-bottom:4px" hidden><input type="checkbox" id="fastEng"><span>Fast engine (off by default). Builds each frame exactly instead of recording in real time. If it fails here, or its clip has no sound, it switches back to the normal recorder by itself.</span></label>
     <div id="banner" class="banner" hidden>Recording runs at normal speed. Keep this screen on and this tab open until it finishes.</div>
     <div class="clips-grid">
@@ -3871,8 +3863,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         error: e => { encErr = encErr || e; }
       });
       aEnc.configure(useAAC
-        ? { codec: 'mp4a.40.2', sampleRate: sr, numberOfChannels: nch, bitrate: sizeBits(true).a }
-        : { codec: 'opus', sampleRate: sr, numberOfChannels: nch, bitrate: sizeBits(true).a });
+        ? { codec: 'mp4a.40.2', sampleRate: sr, numberOfChannels: nch, bitrate: 128000 }
+        : { codec: 'opus', sampleRate: sr, numberOfChannels: nch, bitrate: 128000 });
       // Audio first: slice the clip range into small frames. The fast engine stamps picture and sound exactly.
       const PER = 1024, frames = Math.max(0, s1 - s0);
       for (let off = 0; off < frames; off += PER) {
@@ -3888,7 +3880,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       if (!S.cancel && !aList.length) throw new Error('noaudio'); // encoder gave no audio: use the normal recorder instead
       const makeVEnc = (onChunk, onErr) => {
         const e = new VideoEncoder({ output: onChunk, error: onErr });
-        e.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: sizeBits(true).v, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } });
+        e.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: 14000000, framerate: FPS, latencyMode: 'quality', avc: { format: 'avc' } });
         return e;
       };
       const ft = Math.round(1e6 / FPS), keyEvery = Math.max(1, Math.round(FPS * 2));
@@ -4060,12 +4052,6 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       v.src = u;
     });
   }
-  // Output size presets: video bits per second (normal recorder / fast engine) and sound bits per second.
-  const SIZE_PRESETS = { tiny: [2.5e6, 2.5e6, 96000], small: [4e6, 4e6, 128000], bal: [6e6, 6e6, 128000], high: [8e6, 14e6, 192000] };
-  function sizeBits(fast) {
-    const el = $('#fileSize'), k = el && SIZE_PRESETS[el.value] ? el.value : 'high', p = SIZE_PRESETS[k];
-    return { v: fast ? p[1] : p[0], a: (fast && k === 'high') ? 128000 : p[2] };
-  }
   let WC_OK = true, lastFastErr = '', fastRate = 2, fastRunning = false, fastHidden = false;
   document.addEventListener('visibilitychange', () => { if (fastRunning && document.hidden) fastHidden = true; });
   function fastWhyText(msg, hidden) {
@@ -4124,7 +4110,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     if (o.haveAudio && recDest) recDest.stream.getAudioTracks().forEach(t => out.addTrack(t));
     const mime = pickMime();
     let rec;
-    try { rec = new MediaRecorder(out, { mimeType: mime || undefined, videoBitsPerSecond: sizeBits(false).v, audioBitsPerSecond: sizeBits(false).a }); }
+    try { rec = new MediaRecorder(out, { mimeType: mime || undefined, videoBitsPerSecond: 8000000, audioBitsPerSecond: 192000 }); }
     catch (e) { rec = new MediaRecorder(out); }
     const chunks = [];
     rec.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
@@ -4467,7 +4453,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       try {
         localStorage.setItem(SET_KEY, JSON.stringify({
           bg: S.bg, bgMode: S.bgMode, bgBlur: $('#bgBlur').value, bgOpacity: $('#bgOpacity').value, ar: S.ar,
-          fs: $('#fileSize').value, qN: $('#qN').value, qMin: $('#qMin').value, qMax: $('#qMax').value, aDelay: $('#aDelay').value
+          qN: $('#qN').value, qMin: $('#qMin').value, qMax: $('#qMax').value, aDelay: $('#aDelay').value
         }));
       } catch (e) { /* storage blocked: fine */ }
     }, 300);
@@ -4482,7 +4468,6 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       if (o.bgOpacity != null) { $('#bgOpacity').value = o.bgOpacity; $('#bgOpacity').dispatchEvent(new Event('input')); }
       if (o.ar && RATIOS.some(r => r[0] === o.ar)) setRatio(o.ar);
       if (o.aDelay != null) setAudioDelay(o.aDelay);
-      if (o.fs && SIZE_PRESETS[o.fs]) $('#fileSize').value = o.fs;
       if (o.qN) $('#qN').value = o.qN;
       if (o.qMin) $('#qMin').value = o.qMin;
       if (o.qMax != null) $('#qMax').value = o.qMax;
