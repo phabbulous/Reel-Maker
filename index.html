@@ -356,7 +356,8 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
           <h3>Text lines for the clips</h3>
           <label class="textfield" for="lines">One line per clip. They go in the first text box of each clip of the video you are looking at.<textarea id="lines" rows="4" maxlength="2000" placeholder="One line for each clip, for example:&#10;Wait for the ending&#10;Do not watch this alone"></textarea></label>
           <label class="chk"><input type="checkbox" id="shuffle"><span>Shuffle the lines before putting them on the clips</span></label>
-          <div class="actions"><button id="applyLines" class="btn small" type="button" disabled>Put the lines on the clips</button></div>
+          <div class="actions"><button id="applyLines" class="btn small" type="button" disabled>Put the lines on the clips</button><button id="clearText" class="btn small" type="button" disabled>Remove all text from all clips</button></div>
+          <p class="hint" id="clearNote" hidden></p>
         </div>
         <p class="hint">Every clip can have several texts. Open Position, size and lines under a text to put it above, below, at the top or bottom of the screen, move it, resize it, or set how many lines it takes. Long batches use phone memory, so save clips as they finish.</p>
         <div id="clipList" class="listcol"><p class="empty" id="clipEmpty">No clips yet. Choose videos, then tap Make all clips.</p></div>
@@ -3099,11 +3100,14 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     const st = settings();
     targets().forEach(v => pickFor(v, st));
     setActive(S.clips[0] || null);
-    if ($('#lines').value.trim()) applyLines();
+    if ($('#lines').value.trim() && !linesHeld) applyLines();
     $('#analyzeNote').textContent = 'Picked ' + st.n + ' clips for ' + targets().length + (targets().length === 1 ? ' video' : ' videos') + '. Add text below, then tap Make all clips.';
   }
 
+  // After "Remove all text" the saved lines are not put back on by themselves; they wait until you tap Put the lines on the clips or edit them.
+  let linesHeld = false;
   function applyLines() {
+    linesHeld = false;
     let ls = $('#lines').value.split('\n').map(x => x.trim()).filter(Boolean);
     if (!ls.length || !S.clips.length) return;
     if ($('#shuffle').checked) ls = ls.map(v => [Math.random(), v]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
@@ -3111,6 +3115,28 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     requestPreview();
   }
   $('#applyLines').addEventListener('click', applyLines);
+  $('#lines').addEventListener('input', () => { linesHeld = false; });
+  // Remove all text from every clip of every video (two taps, so it cannot happen by accident). The text boxes stay, with their position and size settings.
+  let clearArm = 0;
+  $('#clearText').addEventListener('click', () => {
+    const btn = $('#clearText'), note = $('#clearNote');
+    let withText = 0; videos.forEach(v => v.clips.forEach(c => { if (hasText(c)) withText++; }));
+    if (!withText) { note.textContent = 'No clip has any text.'; note.hidden = false; return; }
+    if (!clearArm) {
+      btn.textContent = 'Tap again to remove the text from ' + withText + (withText === 1 ? ' clip' : ' clips');
+      clearArm = setTimeout(() => { clearArm = 0; btn.textContent = 'Remove all text from all clips'; }, 6000);
+      return;
+    }
+    clearTimeout(clearArm); clearArm = 0; btn.textContent = 'Remove all text from all clips';
+    videos.forEach(v => v.clips.forEach(c => {
+      let changed = false;
+      c.layers.forEach(L => { if (L.text && L.text.trim()) { L.text = ''; changed = true; syncLayerUI(L); } });
+      if (changed) markStale(c);
+    }));
+    linesHeld = true;
+    note.textContent = 'Removed the text from ' + withText + (withText === 1 ? ' clip' : ' clips') + '. Your list of lines above is kept; tap Put the lines on the clips to use it again.'; note.hidden = false;
+    closeAllClipPreviews && closeAllClipPreviews(); requestPreview();
+  });
 
   /* ---------- busy-moment finder ---------- */
   // Looks at the video as a series of small snapshots: how much the picture changes (motion), where it jumps (scene cuts), and how loud the sound is. It finds energetic parts, not the meaning of a scene.
@@ -3815,6 +3841,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       cur._abuf = buf; return buf;
     } finally { try { ac.close(); } catch (e) { /* ignore */ } }
   }
+  // The banner says which engine is working right now, and goes back to the normal wording if the fast engine fails and the normal recorder takes over.
+  function setBanner(fast) { const b = $('#banner'); if (b) b.textContent = fast ? 'Fast engine is working: this clip is built faster than real time. Keep this screen on and this tab open until it finishes.' : 'Recording at normal speed. Keep this screen on and this tab open until it finishes.'; }
   async function makeClipFast(c, inBatch) {
     if (S.busy) return true;
     if (c.v !== cur) { const ok = await useVideo(c.v); if (!ok) { noteOf(c, 'This video could not be opened.', 'bad'); return true; } }
@@ -3826,7 +3854,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     S.busy = true; S.cancel = !!c.cancelAsked; updateButtons(); setActive(c);
     if (c.url) { URL.revokeObjectURL(c.url); c.url = null; } c.blob = null; c.resv.textContent = ''; c.resbtns.hidden = true;
     c.bar.style.width = '0%'; noteOf(c, 'Getting ready…');
-    $('#banner').hidden = false; $('#stopBtn').hidden = false;
+    setBanner(true); $('#banner').hidden = false; $('#stopBtn').hidden = false;
     let lock = null;
     try { lock = navigator.wakeLock && await navigator.wakeLock.request('screen'); } catch (e) { /* optional */ }
     const ecx = encSetup();
@@ -4179,7 +4207,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     S.busy = true; S.cancel = !!c.cancelAsked; updateButtons(); setActive(c);
     if (c.url) { URL.revokeObjectURL(c.url); c.url = null; } c.blob = null; c.resv.textContent = ''; c.resbtns.hidden = true;
     c.bar.style.width = '0%'; noteOf(c, 'Getting ready…');
-    $('#banner').hidden = false; $('#stopBtn').hidden = false;
+    setBanner(false); $('#banner').hidden = false; $('#stopBtn').hidden = false;
     let lock = null;
     try { lock = navigator.wakeLock && await navigator.wakeLock.request('screen'); } catch (e) { /* optional */ }
     try {
@@ -4237,7 +4265,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     });
     if (tg.length && S.clips.length === 0 && cur) setActive(null);
     if (cur) setActive(S.clips[0] || null);
-    if ($('#lines').value.trim() && tg.every(v => v.clips.every(c => !hasText(c)))) applyLines();
+    if ($('#lines').value.trim() && !linesHeld && tg.every(v => v.clips.every(c => !hasText(c)))) applyLines();
     const todo = tg.flatMap(v => v.clips.filter(c => !c.blob || c.stale));
     if (!todo.length) return;
     let made = 0, failed = 0;
@@ -4324,6 +4352,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     ['#pbPlay', '#pbMute', '#pbSeek', '#pbMenuBtn'].forEach(q => { $(q).disabled = !has || !idle; });
     $('#makeAll').disabled = !videos.length || !idle;
     $('#applyLines').disabled = !S.clips.length;
+    $('#clearText').disabled = !videos.some(v => v.clips.length) || !idle;
     $('#trims').querySelectorAll('button,input').forEach(x => { x.disabled = !has || !idle; });
     videos.forEach(v => v.clips.forEach(c => {
       c.el.querySelectorAll('button[data-act="make"],button[data-act="look"],button[data-act="set-start"],button[data-act="set-end"],button[data-act="use-times"],button[data-act="dup"],button.tstep,button[data-act="remove"]').forEach(b => { b.disabled = !idle; });
