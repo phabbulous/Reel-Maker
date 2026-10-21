@@ -207,8 +207,9 @@ input[type="color"] { width: 46px; height: 34px; padding: 2px; border: 1px solid
 
 <div class="app">
   <header>
-    <h1>Reel Maker <span class="meta">v4.11</span></h1>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h1 style="margin:0">Reel Maker <span class="meta">v4.11</span></h1><button type="button" class="btn small" id="refreshBtn">Refresh the page</button></div>
     <p class="lede">Crops the bars off your videos, centers the scene on a black 9:16 canvas and puts your text on it. Your videos stay on this device.</p>
+    <div class="replacebar" id="refreshBar" role="alert" hidden><span id="refreshMsg"></span><button type="button" class="btn small primary" id="refreshYes">Refresh now</button><button type="button" class="btn small" id="refreshNo">Keep working</button></div>
     <details class="canvasbox" id="diag" style="margin-top:8px"><summary>Check this browser</summary>
       <p class="hint">Not sure why something fails on one browser? This shows what this browser can do. Take a screenshot to compare browsers or send it to me.</p>
       <button type="button" class="btn small" id="diagRun">Run the check</button>
@@ -2459,10 +2460,46 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     ['epilogue', 'Epilogue', 'Epilogue', 700], ['hind', 'Hind Siliguri', 'Hind Siliguri', 700], ['luckiest', 'Luckiest Guy', 'Luckiest Guy', 400],
     ['montb', 'Montserrat Black', 'Montserrat', 900], ['anton', 'Anton (default)', 'Anton', 400]
   ];
+  // More fonts. They are not downloaded up front: a font is fetched from Google Fonts the first time you pick it (a few KB each), so the page stays light. [name, family, weight, group]
+  const FONT_GROUPS = ['Bold and loud', 'Clean sans', 'Condensed', 'Serif and elegant', 'Handwriting and script', 'Fun, retro and display'];
+  const FONT_CAT = { inter: 1, noto: 1, bebas: 2, oswald: 2, oswaldb: 2, mukta: 1, albert: 1, archivo: 1, archivob: 0, epilogue: 1, hind: 1, luckiest: 5, montb: 0, anton: 0 };
+  [
+    ['Bangers', 'Bangers', 400, 0], ['Staatliches', 'Staatliches', 400, 0], ['Passion One', 'Passion One', 700, 0], ['Titan One', 'Titan One', 400, 0], ['Alfa Slab One', 'Alfa Slab One', 400, 0],
+    ['Bowlby One', 'Bowlby One', 400, 0], ['Black Ops One', 'Black Ops One', 400, 0], ['Russo One', 'Russo One', 400, 0], ['Paytone One', 'Paytone One', 400, 0], ['Lilita One', 'Lilita One', 400, 0],
+    ['Sigmar One', 'Sigmar One', 400, 0], ['Chango', 'Chango', 400, 0], ['Rammetto One', 'Rammetto One', 400, 0], ['Bevan', 'Bevan', 400, 0], ['Ultra', 'Ultra', 400, 0], ['Carter One', 'Carter One', 400, 0],
+    ['Francois One', 'Francois One', 400, 0], ['Changa One', 'Changa One', 400, 0], ['Patua One', 'Patua One', 400, 0], ['Righteous', 'Righteous', 400, 0], ['Bungee', 'Bungee', 400, 0], ['Rubik Mono One', 'Rubik Mono One', 400, 0],
+    ['Poppins', 'Poppins', 700, 1], ['Montserrat', 'Montserrat', 700, 1], ['Roboto', 'Roboto', 700, 1], ['Open Sans', 'Open Sans', 700, 1], ['Lato', 'Lato', 700, 1], ['Raleway', 'Raleway', 700, 1], ['Nunito', 'Nunito', 800, 1],
+    ['Rubik', 'Rubik', 700, 1], ['Barlow', 'Barlow', 700, 1], ['Kanit', 'Kanit', 700, 1], ['Lexend', 'Lexend', 700, 1], ['DM Sans', 'DM Sans', 700, 1], ['Outfit', 'Outfit', 700, 1], ['Sora', 'Sora', 700, 1],
+    ['Work Sans', 'Work Sans', 700, 1], ['Manrope', 'Manrope', 800, 1], ['Space Grotesk', 'Space Grotesk', 700, 1], ['Plus Jakarta Sans', 'Plus Jakarta Sans', 800, 1], ['Urbanist', 'Urbanist', 800, 1], ['Figtree', 'Figtree', 800, 1],
+    ['Fredoka', 'Fredoka', 700, 1], ['Baloo 2', 'Baloo 2', 800, 1],
+    ['Barlow Condensed', 'Barlow Condensed', 700, 2], ['Roboto Condensed', 'Roboto Condensed', 700, 2], ['Archivo Narrow', 'Archivo Narrow', 700, 2], ['Saira Condensed', 'Saira Condensed', 700, 2], ['Teko', 'Teko', 700, 2],
+    ['Fjalla One', 'Fjalla One', 400, 2], ['League Gothic', 'League Gothic', 400, 2], ['Big Shoulders Display', 'Big Shoulders Display', 800, 2], ['Squada One', 'Squada One', 400, 2], ['Six Caps', 'Six Caps', 400, 2],
+    ['Playfair Display', 'Playfair Display', 700, 3], ['Merriweather', 'Merriweather', 700, 3], ['Lora', 'Lora', 700, 3], ['Abril Fatface', 'Abril Fatface', 400, 3], ['Cinzel', 'Cinzel', 700, 3], ['DM Serif Display', 'DM Serif Display', 400, 3],
+    ['Cormorant Garamond', 'Cormorant Garamond', 700, 3], ['Libre Baskerville', 'Libre Baskerville', 700, 3], ['Bitter', 'Bitter', 700, 3], ['Zilla Slab', 'Zilla Slab', 700, 3], ['Rozha One', 'Rozha One', 400, 3],
+    ['Pacifico', 'Pacifico', 400, 4], ['Lobster', 'Lobster', 400, 4], ['Dancing Script', 'Dancing Script', 700, 4], ['Caveat', 'Caveat', 700, 4], ['Permanent Marker', 'Permanent Marker', 400, 4], ['Satisfy', 'Satisfy', 400, 4],
+    ['Kaushan Script', 'Kaushan Script', 400, 4], ['Great Vibes', 'Great Vibes', 400, 4], ['Sacramento', 'Sacramento', 400, 4], ['Shadows Into Light', 'Shadows Into Light', 400, 4], ['Amatic SC', 'Amatic SC', 700, 4],
+    ['Rock Salt', 'Rock Salt', 400, 4], ['Gloria Hallelujah', 'Gloria Hallelujah', 400, 4], ['Yellowtail', 'Yellowtail', 400, 4], ['Courgette', 'Courgette', 400, 4], ['Marck Script', 'Marck Script', 400, 4],
+    ['Press Start 2P', 'Press Start 2P', 400, 5], ['Special Elite', 'Special Elite', 400, 5], ['Creepster', 'Creepster', 400, 5], ['Orbitron', 'Orbitron', 700, 5], ['Audiowide', 'Audiowide', 400, 5], ['Monoton', 'Monoton', 400, 5],
+    ['Chewy', 'Chewy', 400, 5], ['Gochi Hand', 'Gochi Hand', 400, 5], ['Pirata One', 'Pirata One', 400, 5], ['UnifrakturCook', 'UnifrakturCook', 700, 5], ['VT323', 'VT323', 400, 5], ['Cabin Sketch', 'Cabin Sketch', 700, 5],
+    ['Faster One', 'Faster One', 400, 5], ['Fugaz One', 'Fugaz One', 400, 5], ['Boogaloo', 'Boogaloo', 400, 5], ['Nosifer', 'Nosifer', 400, 5], ['Metal Mania', 'Metal Mania', 400, 5], ['Eater', 'Eater', 400, 5]
+  ].forEach(([label, fam, w, g]) => FONTS.push([label.toLowerCase().replace(/[^a-z0-9]+/g, ''), label, fam, w, g, fam.replace(/ /g, '+') + (w === 400 ? '' : ':wght@' + w)]));
+  FONTS.forEach(f => { if (f[4] == null) f[4] = FONT_CAT[f[0]] != null ? FONT_CAT[f[0]] : 1; });
+  // Builds the font list (grouped). With a search word, only matching fonts are listed; the font already in use always stays in the list so it is never lost.
+  function fontOptions(q, cur) {
+    q = String(q || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const hit = f => !q || f[1].toLowerCase().replace(/[^a-z0-9]+/g, '').includes(q) || f[0] === cur;
+    const out = FONT_GROUPS.map((g, gi) => { const fs = FONTS.filter(f => f[4] === gi && hit(f)); return fs.length ? '<optgroup label="' + g + '">' + fs.map(f => '<option value="' + f[0] + '">' + f[1] + '</option>').join('') + '</optgroup>' : ''; }).join('');
+    return FONTS.some(f => hit(f) && f[0] !== cur) || !q ? out : out + '<option value="" disabled>No other font matches</option>';
+  }
+  const fontLinks = new Set();
+  function ensureFontLink(f) {
+    if (!f[5] || fontLinks.has(f[5])) return; fontLinks.add(f[5]);
+    try { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=' + f[5] + '&display=swap'; document.head.appendChild(l); } catch (e) { /* offline or blocked: falls back to Inter */ }
+  }
   const tried = new Set();
   const fontDef = id => FONTS.find(f => f[0] === id) || FONTS[0];
   const fontCss = (id, px) => { const f = fontDef(id); return f[3] + ' ' + px + 'px "' + f[2] + '", Inter, Arial, sans-serif'; };
-  const loadFontFor = id => { const f = fontDef(id); return document.fonts ? document.fonts.load(f[3] + ' 40px "' + f[2] + '"').catch(() => {}) : Promise.resolve(); };
+  const loadFontFor = id => { const f = fontDef(id); ensureFontLink(f); return document.fonts ? document.fonts.load(f[3] + ' 40px "' + f[2] + '"').catch(() => {}) : Promise.resolve(); };
   const newLayer = (text, anchor) => ({ text: text || '', anchor: anchor || 'above', font: 'anton', size: 0, lines: 0, dx: 0, dy: 0, color: '#ffffff', _el: null });
   const cloneLayer = l => ({ text: l.text, anchor: l.anchor, font: l.font || 'anton', size: l.size, lines: l.lines, dx: l.dx, dy: l.dy, color: l.color || '#ffffff', _el: null });
 
@@ -2662,7 +2699,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       '<label class="textfield"><span class="ltitle"></span><textarea rows="2" maxlength="160" placeholder="Two short lines work best"></textarea></label>' +
       '<details><summary>Position, size and lines</summary>' +
         '<div class="lgrid">' +
-          '<label>Font<select data-k="font">' + FONTS.map(f => '<option value="' + f[0] + '">' + f[1] + '</option>').join('') + '</select></label>' +
+          '<label>Font<input type="search" data-k="fontq" placeholder="Search ' + FONTS.length + ' fonts" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search fonts"><select data-k="font">' + fontOptions('', '') + '</select></label>' +
           '<label>Place<select data-k="anchor">' + ANCHORS.map(a => '<option value="' + a[0] + '">' + a[1] + '</option>').join('') + '</select></label>' +
           '<label>Text color<input type="color" data-k="color" value="#ffffff"></label>' +
           stepper('size', 'Size in px (blank = auto)') + stepper('lines', 'Lines (blank = auto; ignored if you press Enter)') +
@@ -2791,6 +2828,11 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     else if (k === 'color') L.color = e.target.value;
     else return;
     S.sel = { c, L }; markStale(c); if (c === S.active) requestPreview();
+  });
+  list.addEventListener('input', e => {
+    if (e.target.dataset.k !== 'fontq') return;
+    const lay = e.target.closest('.layer'); if (!lay || !lay._layer) return;
+    const sel = lay.querySelector('select[data-k=font]'); sel.innerHTML = fontOptions(e.target.value, lay._layer.font); sel.value = lay._layer.font;
   });
   list.addEventListener('change', async e => {
     const card = e.target.closest('.clip'); if (!card) return;
@@ -4282,6 +4324,14 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     setTimeout(() => { if (!S.busy) { bn.hidden = true; bn.textContent = 'Recording runs at normal speed. Keep this screen on and this tab open until it finishes.'; } }, 20000);
   });
   $('#stopBtn').addEventListener('click', () => { S.cancel = true; });
+  // Refresh the page, after asking. Videos and clips are only kept in the page, so a refresh clears them (your settings and sound-sync value are remembered).
+  $('#refreshBtn').addEventListener('click', () => {
+    let made = 0; videos.forEach(v => v.clips.forEach(c => { if (c.blob) made++; }));
+    $('#refreshMsg').textContent = (S.busy ? 'A clip is being made right now and will be lost. ' : '') + 'Refreshing clears the videos and clips on this page' + (made ? ', including ' + made + (made === 1 ? ' clip' : ' clips') + ' you have not saved' : '') + '. Your settings are kept. Refresh?';
+    $('#refreshBar').hidden = false; $('#refreshBar').scrollIntoView({ block: 'nearest' });
+  });
+  $('#refreshNo').addEventListener('click', () => { $('#refreshBar').hidden = true; });
+  $('#refreshYes').addEventListener('click', () => { try { saveSettings && clearTimeout(setT); } catch (e) { /* ignore */ } location.reload(); });
 
   const clipName = c => {
     const inp = c.el && c.el.querySelector('input.fname');
