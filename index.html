@@ -168,6 +168,16 @@ select { font: 14px var(--font-ui); color: var(--ink); background: var(--surface
 .lgrid .stepper { grid-template-columns: 44px minmax(0, 1fr) 44px; }
 .lgrid .stepper button { min-height: 44px; touch-action: manipulation; user-select: none; }
 .lgrid input { text-align: center; }
+.ffield { display: grid; gap: 3px; font-size: 12px; color: var(--muted); min-width: 0; }
+.fontbtn { font: 14px var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 8px; text-align: left; width: 100%; min-height: 42px; cursor: pointer; }
+.fontpanel { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 6px; display: grid; gap: 6px; }
+.lgrid .fontpanel input { text-align: left; }
+.fontlist { position: relative; max-height: 240px; overflow-y: auto; display: grid; gap: 2px; -webkit-overflow-scrolling: touch; }
+.fontgrp { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); padding: 6px 6px 2px; }
+.fontitem { font: 14px var(--font-ui); color: var(--ink); background: transparent; border: 0; border-radius: 6px; padding: 10px 8px; text-align: left; cursor: pointer; min-height: 40px; }
+.fontitem:hover, .fontitem:focus-visible { background: var(--accent-soft); }
+.fontitem.on { background: var(--accent-soft); font-weight: 600; }
+.fontnone { padding: 10px 8px; color: var(--muted); font-size: 13px; }
 .canvasbox { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); display: grid; gap: 8px; }
 .canvasbox summary { font-size: 13px; font-weight: 600; cursor: pointer; min-height: 32px; display: flex; align-items: center; }
 .ratiorow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -2699,7 +2709,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       '<label class="textfield"><span class="ltitle"></span><textarea rows="2" maxlength="160" placeholder="Two short lines work best"></textarea></label>' +
       '<details><summary>Position, size and lines</summary>' +
         '<div class="lgrid">' +
-          '<label>Font<input type="search" data-k="fontq" placeholder="Search ' + FONTS.length + ' fonts" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search fonts"><select data-k="font">' + fontOptions('', '') + '</select></label>' +
+          '<div class="ffield"><span class="flabel">Font</span><button type="button" class="fontbtn" data-k="fontbtn" aria-haspopup="listbox" aria-expanded="false"></button><div class="fontpanel" hidden><input type="text" data-k="fontq" placeholder="Type to search ' + FONTS.length + ' fonts" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search fonts"><div class="fontlist" role="listbox"></div></div><select data-k="font" hidden aria-hidden="true" tabindex="-1">' + fontOptions('', '') + '</select></div>' +
           '<label>Place<select data-k="anchor">' + ANCHORS.map(a => '<option value="' + a[0] + '">' + a[1] + '</option>').join('') + '</select></label>' +
           '<label>Text color<input type="color" data-k="color" value="#ffffff"></label>' +
           stepper('size', 'Size in px (blank = auto)') + stepper('lines', 'Lines (blank = auto; ignored if you press Enter)') +
@@ -2714,7 +2724,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   function syncLayerUI(L) {
     const b = L._el; if (!b) return;
     $('textarea', b).value = L.text;
-    $('[data-k=anchor]', b).value = L.anchor; $('[data-k=font]', b).value = L.font;
+    $('[data-k=anchor]', b).value = L.anchor; $('[data-k=font]', b).value = L.font; syncFontBtn(b);
     $('[data-k=color]', b).value = L.color || '#ffffff';
     $('[data-k=size]', b).value = L.size || ''; $('[data-k=lines]', b).value = L.lines || '';
     $('[data-k=dx]', b).value = L.dx || ''; $('[data-k=dy]', b).value = L.dy || '';
@@ -2829,11 +2839,57 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     else return;
     S.sel = { c, L }; markStale(c); if (c === S.active) requestPreview();
   });
+  // Font picker: tap the font name, type to narrow the list right there, tap a font to use it.
+  function fontListHtml(q, cur) {
+    q = String(q || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    let n = 0, html = '';
+    if (q) { // searching: one flat list, best matches first (name starts with it, then a word starts with it, then it appears anywhere)
+      const rank = f => { const nm = f[1].toLowerCase(), flat = nm.replace(/[^a-z0-9]+/g, ''); if (!flat.includes(q)) return 9; if (flat.startsWith(q)) return 0; return nm.split(/[^a-z0-9]+/).some(w => w.startsWith(q)) ? 1 : 2; };
+      const hits = FONTS.map(f => [rank(f), f]).filter(x => x[0] < 9).sort((x, y) => x[0] - y[0] || x[1][1].localeCompare(y[1][1])).map(x => x[1]);
+      return hits.length ? hits.map(f => '<button type="button" role="option" class="fontitem' + (f[0] === cur ? ' on' : '') + '" data-id="' + f[0] + '">' + f[1] + '</button>').join('') : '<div class="fontnone">No font matches "' + String(q).replace(/[<>&"]/g, '') + '"</div>';
+    }
+    FONT_GROUPS.forEach((g, gi) => {
+      const fs = FONTS.filter(f => f[4] === gi && (!q || f[1].toLowerCase().replace(/[^a-z0-9]+/g, '').includes(q)));
+      if (!fs.length) return; n += fs.length;
+      html += '<div class="fontgrp">' + g + '</div>' + fs.map(f => '<button type="button" role="option" class="fontitem' + (f[0] === cur ? ' on' : '') + '" data-id="' + f[0] + '">' + f[1] + '</button>').join('');
+    });
+    return n ? html : '<div class="fontnone">No font matches "' + String(q).replace(/[<>&"]/g, '') + '"</div>';
+  }
+  function syncFontBtn(lay) {
+    if (!lay || !lay._layer) return; const b = lay.querySelector('.fontbtn'); if (b) b.textContent = fontDef(lay._layer.font)[1] + '  ▾';
+  }
+  function closeFontPanel(lay) { const pn = lay.querySelector('.fontpanel'); if (pn) pn.hidden = true; const b = lay.querySelector('.fontbtn'); if (b) b.setAttribute('aria-expanded', 'false'); }
   list.addEventListener('input', e => {
     if (e.target.dataset.k !== 'fontq') return;
     const lay = e.target.closest('.layer'); if (!lay || !lay._layer) return;
-    const sel = lay.querySelector('select[data-k=font]'); sel.innerHTML = fontOptions(e.target.value, lay._layer.font); sel.value = lay._layer.font;
+    lay.querySelector('.fontlist').innerHTML = fontListHtml(e.target.value, lay._layer.font);
   });
+  list.addEventListener('keydown', e => {
+    if (e.target.dataset && e.target.dataset.k === 'fontq') {
+      const lay = e.target.closest('.layer');
+      if (e.key === 'Escape') { closeFontPanel(lay); return; }
+      if (e.key === 'Enter') { e.preventDefault(); const it = lay.querySelector('.fontitem'); if (it) it.click(); }
+    }
+  });
+  list.addEventListener('click', e => {
+    const lay = e.target.closest('.layer'); if (!lay || !lay._layer) return;
+    const fb = e.target.closest('.fontbtn');
+    if (fb) {
+      const pn = lay.querySelector('.fontpanel'), open = pn.hidden;
+      list.querySelectorAll('.fontpanel').forEach(x => { x.hidden = true; });
+      if (open) {
+        const q = pn.querySelector('input'); q.value = ''; pn.querySelector('.fontlist').innerHTML = fontListHtml('', lay._layer.font); pn.hidden = false; fb.setAttribute('aria-expanded', 'true');
+        try { q.focus({ preventScroll: true }); const on = pn.querySelector('.fontitem.on'); if (on) pn.querySelector('.fontlist').scrollTop = Math.max(0, on.offsetTop - 60); } catch (x) { /* ignore */ }
+      }
+      return;
+    }
+    const it = e.target.closest('.fontitem');
+    if (it) {
+      const sel = lay.querySelector('select[data-k=font]'); sel.value = it.dataset.id; sel.dispatchEvent(new Event('change', { bubbles: true }));
+      syncFontBtn(lay); closeFontPanel(lay);
+    }
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.ffield')) document.querySelectorAll('.fontpanel').forEach(x => { x.hidden = true; }); });
   list.addEventListener('change', async e => {
     const card = e.target.closest('.clip'); if (!card) return;
     const c = card._clip;
