@@ -174,6 +174,10 @@ select { font: 14px var(--font-ui); color: var(--ink); background: var(--surface
 .lgrid .fontpanel input { text-align: left; }
 .fontlist { position: relative; max-height: 240px; overflow-y: auto; display: grid; gap: 2px; -webkit-overflow-scrolling: touch; }
 .fontgrp { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); padding: 6px 6px 2px; }
+.fontrow { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: stretch; }
+.fontstar { font-size: 20px; line-height: 1; background: transparent; border: 0; border-radius: 6px; color: var(--muted); cursor: pointer; min-height: 40px; touch-action: manipulation; }
+.fontstar.on { color: #e0a800; }
+.fontstar:hover, .fontstar:focus-visible { background: var(--accent-soft); }
 .fontitem { font: 14px var(--font-ui); color: var(--ink); background: transparent; border: 0; border-radius: 6px; padding: 10px 8px; text-align: left; cursor: pointer; min-height: 40px; }
 .fontitem:hover, .fontitem:focus-visible { background: var(--accent-soft); }
 .fontitem.on { background: var(--accent-soft); font-weight: 600; }
@@ -2510,8 +2514,8 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   const fontDef = id => FONTS.find(f => f[0] === id) || FONTS[0];
   const fontCss = (id, px) => { const f = fontDef(id); return f[3] + ' ' + px + 'px "' + f[2] + '", Inter, Arial, sans-serif'; };
   const loadFontFor = id => { const f = fontDef(id); ensureFontLink(f); return document.fonts ? document.fonts.load(f[3] + ' 40px "' + f[2] + '"').catch(() => {}) : Promise.resolve(); };
-  const newLayer = (text, anchor) => ({ text: text || '', anchor: anchor || 'above', font: 'anton', size: 0, lines: 0, dx: 0, dy: 0, color: '#ffffff', _el: null });
-  const cloneLayer = l => ({ text: l.text, anchor: l.anchor, font: l.font || 'anton', size: l.size, lines: l.lines, dx: l.dx, dy: l.dy, color: l.color || '#ffffff', _el: null });
+  const newLayer = (text, anchor) => ({ text: text || '', anchor: anchor || 'above', font: 'anton', size: 0, lines: 0, dx: 0, dy: 0, align: 'center', color: '#ffffff', _el: null });
+  const cloneLayer = l => ({ text: l.text, anchor: l.anchor, font: l.font || 'anton', size: l.size, lines: l.lines, dx: l.dx, dy: l.dy, align: l.align || 'center', color: l.color || '#ffffff', _el: null });
 
   function wrapLine(ctx, line, maxW) {
     const out = []; let cur2 = '';
@@ -2563,14 +2567,18 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     }
     bottom += L.dy;
     ctx.save();
-    ctx.fillStyle = L.color || '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    // Alignment: the block keeps its place (centered on the position); left and right line the lines up on the block's left or right edge.
+    const al = L.align === 'left' || L.align === 'right' ? L.align : 'center';
+    ctx.font = fontCss(L.font, fs);
+    const blockW = Math.max(...lines.map(l => ctx.measureText(l).width));
+    ctx.fillStyle = L.color || '#fff'; ctx.textAlign = al; ctx.textBaseline = 'bottom';
     if (L.anchor === 'middle') { ctx.shadowColor = 'rgba(0,0,0,0.65)'; ctx.shadowBlur = 10; }
     // Hard outline for readability over bright scenes: stroke first, then fill.
     ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(0,0,0,0.92)';
     ctx.lineWidth = Math.max(3, Math.round(fs / 12));
     for (let i = 0; i < lines.length; i++) {
-      const tx = W / 2 + L.dx, ty = bottom - (lines.length - 1 - i) * lh;
+      const tx = W / 2 + L.dx + (al === 'left' ? -blockW / 2 : al === 'right' ? blockW / 2 : 0), ty = bottom - (lines.length - 1 - i) * lh;
       ctx.strokeText(lines[i], tx, ty);
       ctx.fillText(lines[i], tx, ty);
     }
@@ -2710,6 +2718,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       '<details><summary>Position, size and lines</summary>' +
         '<div class="lgrid">' +
           '<div class="ffield"><span class="flabel">Font</span><button type="button" class="fontbtn" data-k="fontbtn" aria-haspopup="listbox" aria-expanded="false"></button><div class="fontpanel" hidden><input type="text" data-k="fontq" placeholder="Type to search ' + FONTS.length + ' fonts" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search fonts"><div class="fontlist" role="listbox"></div></div><select data-k="font" hidden aria-hidden="true" tabindex="-1">' + fontOptions('', '') + '</select></div>' +
+          '<label>Text alignment<select data-k="align"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>' +
           '<label>Place<select data-k="anchor">' + ANCHORS.map(a => '<option value="' + a[0] + '">' + a[1] + '</option>').join('') + '</select></label>' +
           '<label>Text color<input type="color" data-k="color" value="#ffffff"></label>' +
           stepper('size', 'Size in px (blank = auto)') + stepper('lines', 'Lines (blank = auto; ignored if you press Enter)') +
@@ -2724,7 +2733,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
   function syncLayerUI(L) {
     const b = L._el; if (!b) return;
     $('textarea', b).value = L.text;
-    $('[data-k=anchor]', b).value = L.anchor; $('[data-k=font]', b).value = L.font; syncFontBtn(b);
+    $('[data-k=anchor]', b).value = L.anchor; $('[data-k=align]', b).value = L.align || 'center'; $('[data-k=font]', b).value = L.font; syncFontBtn(b);
     $('[data-k=color]', b).value = L.color || '#ffffff';
     $('[data-k=size]', b).value = L.size || ''; $('[data-k=lines]', b).value = L.lines || '';
     $('[data-k=dx]', b).value = L.dx || ''; $('[data-k=dy]', b).value = L.dy || '';
@@ -2839,21 +2848,31 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
     else return;
     S.sel = { c, L }; markStale(c); if (c === S.active) requestPreview();
   });
+  // Favourite and recently used fonts, remembered on this device.
+  const FAV_KEY = 'reelmaker.fontfav.v1', REC_KEY = 'reelmaker.fontrec.v1', REC_MAX = 7;
+  const readIds = k => { try { const a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a.filter(id => FONTS.some(f => f[0] === id)) : []; } catch (e) { return []; } };
+  const writeIds = (k, a) => { try { localStorage.setItem(k, JSON.stringify(a)); } catch (e) { /* storage blocked: kept for this visit only */ memIds[k] = a; } };
+  const memIds = {};
+  const favIds = () => (memIds[FAV_KEY] || readIds(FAV_KEY));
+  const recIds = () => (memIds[REC_KEY] || readIds(REC_KEY));
+  function noteRecent(id) { writeIds(REC_KEY, [id].concat(recIds().filter(x => x !== id)).slice(0, REC_MAX)); }
+  function toggleFav(id) { const a = favIds(); writeIds(FAV_KEY, a.includes(id) ? a.filter(x => x !== id) : a.concat(id)); }
   // Font picker: tap the font name, type to narrow the list right there, tap a font to use it.
   function fontListHtml(q, cur) {
     q = String(q || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-    let n = 0, html = '';
-    if (q) { // searching: one flat list, best matches first (name starts with it, then a word starts with it, then it appears anywhere)
+    const favs = favIds(), recs = recIds();
+    const row = f => '<div class="fontrow"><button type="button" role="option" class="fontitem' + (f[0] === cur ? ' on' : '') + '" data-id="' + f[0] + '">' + f[1] + '</button><button type="button" class="fontstar' + (favs.includes(f[0]) ? ' on' : '') + '" data-star="' + f[0] + '" aria-label="' + (favs.includes(f[0]) ? 'Remove ' : 'Add ') + f[1] + (favs.includes(f[0]) ? ' from favorites' : ' to favorites') + '" aria-pressed="' + favs.includes(f[0]) + '">' + (favs.includes(f[0]) ? '★' : '☆') + '</button></div>';
+    const byId = id => FONTS.find(f => f[0] === id);
+    if (q) { // searching: one flat list, favourites first, then best matches (name starts with it, a word starts with it, anywhere)
       const rank = f => { const nm = f[1].toLowerCase(), flat = nm.replace(/[^a-z0-9]+/g, ''); if (!flat.includes(q)) return 9; if (flat.startsWith(q)) return 0; return nm.split(/[^a-z0-9]+/).some(w => w.startsWith(q)) ? 1 : 2; };
-      const hits = FONTS.map(f => [rank(f), f]).filter(x => x[0] < 9).sort((x, y) => x[0] - y[0] || x[1][1].localeCompare(y[1][1])).map(x => x[1]);
-      return hits.length ? hits.map(f => '<button type="button" role="option" class="fontitem' + (f[0] === cur ? ' on' : '') + '" data-id="' + f[0] + '">' + f[1] + '</button>').join('') : '<div class="fontnone">No font matches "' + String(q).replace(/[<>&"]/g, '') + '"</div>';
+      const hits = FONTS.map(f => [rank(f), f]).filter(x => x[0] < 9).sort((x, y) => (favs.includes(y[1][0]) - favs.includes(x[1][0])) || x[0] - y[0] || x[1][1].localeCompare(y[1][1])).map(x => x[1]);
+      return hits.length ? hits.map(row).join('') : '<div class="fontnone">No font matches "' + String(q).replace(/[<>&"]/g, '') + '"</div>';
     }
-    FONT_GROUPS.forEach((g, gi) => {
-      const fs = FONTS.filter(f => f[4] === gi && (!q || f[1].toLowerCase().replace(/[^a-z0-9]+/g, '').includes(q)));
-      if (!fs.length) return; n += fs.length;
-      html += '<div class="fontgrp">' + g + '</div>' + fs.map(f => '<button type="button" role="option" class="fontitem' + (f[0] === cur ? ' on' : '') + '" data-id="' + f[0] + '">' + f[1] + '</button>').join('');
-    });
-    return n ? html : '<div class="fontnone">No font matches "' + String(q).replace(/[<>&"]/g, '') + '"</div>';
+    let html = '';
+    const fl = favs.map(byId).filter(Boolean); if (fl.length) html += '<div class="fontgrp">★ Favorites</div>' + fl.map(row).join('');
+    const rl = recs.map(byId).filter(Boolean); if (rl.length) html += '<div class="fontgrp">Recent</div>' + rl.map(row).join('');
+    FONT_GROUPS.forEach((g, gi) => { const fs = FONTS.filter(f => f[4] === gi); if (fs.length) html += '<div class="fontgrp">' + g + '</div>' + fs.map(row).join(''); });
+    return html;
   }
   function syncFontBtn(lay) {
     if (!lay || !lay._layer) return; const b = lay.querySelector('.fontbtn'); if (b) b.textContent = fontDef(lay._layer.font)[1] + '  ▾';
@@ -2879,17 +2898,23 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       list.querySelectorAll('.fontpanel').forEach(x => { x.hidden = true; });
       if (open) {
         const q = pn.querySelector('input'); q.value = ''; pn.querySelector('.fontlist').innerHTML = fontListHtml('', lay._layer.font); pn.hidden = false; fb.setAttribute('aria-expanded', 'true');
-        try { q.focus({ preventScroll: true }); const on = pn.querySelector('.fontitem.on'); if (on) pn.querySelector('.fontlist').scrollTop = Math.max(0, on.offsetTop - 60); } catch (x) { /* ignore */ }
+        try { const on = pn.querySelector('.fontitem.on'); if (on) pn.querySelector('.fontlist').scrollTop = Math.max(0, on.offsetTop - 60); } catch (x) { /* ignore */ }
       }
       return;
     }
+    const st = e.target.closest('.fontstar');
+    if (st) { // star: add or remove a favorite, keep the list open where it is
+      const fl = lay.querySelector('.fontlist'), top = fl.scrollTop, q = lay.querySelector('.fontpanel input').value;
+      toggleFav(st.dataset.star); fl.innerHTML = fontListHtml(q, lay._layer.font); fl.scrollTop = top; e.stopPropagation(); return;
+    }
     const it = e.target.closest('.fontitem');
     if (it) {
+      noteRecent(it.dataset.id);
       const sel = lay.querySelector('select[data-k=font]'); sel.value = it.dataset.id; sel.dispatchEvent(new Event('change', { bubbles: true }));
       syncFontBtn(lay); closeFontPanel(lay);
     }
   });
-  document.addEventListener('click', e => { if (!e.target.closest('.ffield')) document.querySelectorAll('.fontpanel').forEach(x => { x.hidden = true; }); });
+  document.addEventListener('click', e => { if (e.target.isConnected && !e.target.closest('.ffield')) document.querySelectorAll('.fontpanel').forEach(x => { x.hidden = true; }); });
   list.addEventListener('change', async e => {
     const card = e.target.closest('.clip'); if (!card) return;
     const c = card._clip;
@@ -2901,6 +2926,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
       return;
     }
     if (e.target.dataset.k === 'font') { const L = e.target.closest('.layer')._layer; L.font = e.target.value; loadFontFor(L.font).then(() => { markStale(c); setActive(c); requestPreview(); }); markStale(c); return; }
+    if (e.target.dataset.k === 'align') { const L = e.target.closest('.layer')._layer; L.align = e.target.value; markStale(c); setActive(c); requestPreview(); return; }
     if (e.target.dataset.k === 'anchor') { const L = e.target.closest('.layer')._layer; L.anchor = e.target.value; markStale(c); setActive(c); requestPreview(); return; }
     const isS = e.target === c.inS, isE = e.target === c.inE;
     if (!isS && !isE) return;
@@ -3110,7 +3136,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
         c.layers.forEach((src, j) => {
           let d = o.layers[j];
           if (!d) { d = newLayer(''); o.layers.push(d); addLayerUI(o, d); }
-          d.anchor = src.anchor; d.font = src.font; d.size = src.size; d.lines = src.lines; d.dx = src.dx; d.dy = src.dy; syncLayerUI(d);
+          d.anchor = src.anchor; d.font = src.font; d.size = src.size; d.lines = src.lines; d.dx = src.dx; d.dy = src.dy; d.align = src.align || 'center'; syncLayerUI(d);
         });
         markStale(o);
       });
